@@ -11,7 +11,7 @@ import { useAuth } from "@/src/contexts/AuthContext";
 import { UpgradePrompt } from "@/src/components/UpgradePrompt";
 
 const LANGUAGES = [
-  "English", "Hindi", "Hinglish", "Bengali", "Tamil", "Telugu", "Marathi",
+  "English", "Hindi", "Sanskrit", "Hinglish", "Bengali", "Tamil", "Telugu", "Marathi",
   "Gujarati", "Kannada", "Malayalam", "Punjabi", "Odia", "Urdu", "Assamese",
 ];
 

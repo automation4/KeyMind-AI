@@ -33,7 +33,7 @@ export const TOOLS: ToolDef[] = [
       {
         key: "target_language",
         label: "Target Language",
-        choices: ["English", "Hindi", "Bengali", "Tamil", "Telugu", "Marathi", "Gujarati", "Kannada", "Malayalam", "Punjabi", "Urdu", "Spanish", "French", "German", "Arabic", "Japanese", "Chinese"],
+        choices: ["English", "Hindi", "Sanskrit", "Bengali", "Tamil", "Telugu", "Marathi", "Gujarati", "Kannada", "Malayalam", "Punjabi", "Urdu", "Spanish", "French", "German", "Arabic", "Japanese", "Chinese"],
       },
     ],
   },

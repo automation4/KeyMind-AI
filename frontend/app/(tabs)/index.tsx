@@ -24,6 +24,8 @@ import { useTheme } from "@/src/contexts/ThemeContext";
 import { DiffView } from "@/src/components/DiffView";
 import { AdBanner } from "@/src/components/AdBanner";
 import { UpgradePrompt } from "@/src/components/UpgradePrompt";
+import { VocabCard, VocabLanguage, VOCAB_LANGUAGES } from "@/src/components/VocabCard";
+import { storage } from "@/src/utils/storage";
 
 const accentBg: Record<string, string> = {
   orange: COLORS.primary,
@@ -38,7 +40,10 @@ type Result = {
   tool: string;
   original: string;
   suggestions: string[];
+  data?: any;
 };
+
+const VOCAB_LANG_KEY = "keymind_vocab_lang";
 
 export default function WriteScreen() {
   const { user, refreshUser } = useAuth();
@@ -55,6 +60,34 @@ export default function WriteScreen() {
   const [ocrBusy, setOcrBusy] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState<string | undefined>();
+  const [vocabLang, setVocabLang] = useState<VocabLanguage>("Hindi");
+  const [vocabReloading, setVocabReloading] = useState(false);
+
+  // Load preferred vocab translation language (saved selection > first non-English language from setup > Hindi)
+  React.useEffect(() => {
+    (async () => {
+      const saved = await storage.getItem<string>(VOCAB_LANG_KEY, "");
+      if (saved && (VOCAB_LANGUAGES as readonly string[]).includes(saved)) {
+        setVocabLang(saved as VocabLanguage);
+        return;
+      }
+      try {
+        const langsRaw = await storage.getItem<string>("keymind_languages", "");
+        if (langsRaw) {
+          const list = JSON.parse(langsRaw) as string[];
+          // Prefer the first non-English language so the "second line" is genuinely a translation.
+          const preferred =
+            list.find(
+              (l) =>
+                l !== "English" &&
+                (VOCAB_LANGUAGES as readonly string[]).includes(l),
+            ) ||
+            list.find((l) => (VOCAB_LANGUAGES as readonly string[]).includes(l));
+          if (preferred) setVocabLang(preferred as VocabLanguage);
+        }
+      } catch {}
+    })();
+  }, []);
 
   const isPremium = !!(user?.is_premium || user?.is_admin);
   const usesToday = user?.tool_uses_today ?? 0;
@@ -79,6 +112,11 @@ export default function WriteScreen() {
       setUpgradeOpen(true);
       return;
     }
+    // Vocab tool auto-injects the target_language from user's preference.
+    const finalOptions =
+      toolId === "vocab" && !options.target_language
+        ? { ...options, target_language: vocabLang }
+        : options;
     setLoading(true);
     setActiveTool(toolId);
     setError(null);
@@ -87,9 +125,13 @@ export default function WriteScreen() {
       Haptics.selectionAsync().catch(() => {});
     }
     try {
-      const data = await api.tool(toolId, text, options);
-      setResult({ tool: toolId, original: text, suggestions: data.suggestions });
-      // Refresh usage counter from server
+      const data = await api.tool(toolId, text, finalOptions);
+      setResult({
+        tool: toolId,
+        original: text,
+        suggestions: data.suggestions,
+        data: (data as any).data,
+      });
       refreshUser();
     } catch (e: any) {
       if (e?.status === 429) {
@@ -347,7 +389,44 @@ export default function WriteScreen() {
             <Text style={styles.section}>
               {TOOL_BY_ID[result.tool]?.label?.toUpperCase() || "RESULT"}
             </Text>
-            {result.suggestions.map((sug, idx) => (
+            {result.tool === "vocab" && result.data ? (
+              <VocabCard
+                data={result.data}
+                language={vocabLang}
+                loading={vocabReloading}
+                onChangeLanguage={async (lang) => {
+                  setVocabLang(lang);
+                  await storage.setItem(VOCAB_LANG_KEY, lang);
+                  if (!text.trim() || vocabReloading) return;
+                  setVocabReloading(true);
+                  try {
+                    const data = await api.tool("vocab", result.original, { target_language: lang });
+                    setResult({
+                      tool: "vocab",
+                      original: result.original,
+                      suggestions: data.suggestions,
+                      data: (data as any).data,
+                    });
+                    refreshUser();
+                  } catch (e: any) {
+                    if (e?.status === 429) {
+                      setUpgradeMessage(e?.detail || "Daily free limit reached. Upgrade for unlimited.");
+                      setUpgradeOpen(true);
+                      refreshUser();
+                    } else {
+                      setError(e?.detail || e?.message || "Could not translate. Try again.");
+                    }
+                  } finally {
+                    setVocabReloading(false);
+                  }
+                }}
+                onTrickyWordPress={(w) => {
+                  setText(w);
+                  runTool("vocab", { target_language: vocabLang });
+                }}
+              />
+            ) : (
+              result.suggestions.map((sug, idx) => (
               <View key={idx} style={styles.resultCard}>
                 {result.tool === "grammar" && idx === 0 ? (
                   <DiffView original={result.original} corrected={sug} />
@@ -375,7 +454,8 @@ export default function WriteScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            ))}
+              ))
+            )}
 
             <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
               <TouchableOpacity style={styles.ghostBtn} onPress={retry} testID="retry-btn">

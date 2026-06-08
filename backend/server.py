@@ -15,6 +15,8 @@ from datetime import datetime, timezone, timedelta, date
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 from emergentintegrations.llm.openai.text_to_speech import OpenAITextToSpeech
 import base64
+import json
+import re
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -75,6 +77,7 @@ class AIToolResponse(BaseModel):
     original: str
     suggestions: List[str]
     explanation: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
 
 
 class ChatRequest(BaseModel):
@@ -456,8 +459,28 @@ TOOL_PROMPTS: Dict[str, str] = {
         "Format as a numbered list (1., 2., 3.) and nothing else. Match the original language."
     ),
     "vocab": (
-        "Provide a clear, simple explanation of the given word or phrase: meaning, part of speech, "
-        "one usage example. Keep response under 80 words. Plain text only."
+        "You are a multilingual vocabulary tutor. The user wants a translation/explanation in: **{target_language}**.\n"
+        "Output a STRICT JSON object only — no markdown, no code fences, no leading or trailing text — in EXACTLY this shape:\n"
+        "{\n"
+        "  \"word\": \"<the input word/phrase, cleaned>\",\n"
+        "  \"part_of_speech\": \"<noun | verb | adjective | adverb | idiom | phrase | other>\",\n"
+        "  \"meaning_simple\": \"<one short ENGLISH sentence using ONLY everyday words a 10-year-old understands>\",\n"
+        "  \"tricky_words\": [\"<any word from meaning_simple that a beginner might not know; empty list if none>\"],\n"
+        "  \"meaning_translated\": \"<the simple meaning, written in {target_language}>\",\n"
+        "  \"tenses\": {\n"
+        "    \"past\":    {\"english\": \"<short example sentence using the word in PAST tense>\",    \"translated\": \"<same sentence in {target_language}>\"},\n"
+        "    \"present\": {\"english\": \"<short example sentence using the word in PRESENT tense>\", \"translated\": \"<same sentence in {target_language}>\"},\n"
+        "    \"future\":  {\"english\": \"<short example sentence using the word in FUTURE tense>\",  \"translated\": \"<same sentence in {target_language}>\"}\n"
+        "  }\n"
+        "}\n"
+        "RULES:\n"
+        "1. meaning_simple is ALWAYS plain English. tricky_words = unusual words from meaning_simple (or []).\n"
+        "2. All 'translated' fields must be in {target_language} using ITS OWN native script — never substitute another language.\n"
+        "3. If {target_language} is English, the 'translated' field should be the SAME as meaning_simple / english tense sentence.\n"
+        "4. If {target_language} is Hindi, use modern colloquial Hindi in Devanagari.\n"
+        "5. If {target_language} is Sanskrit, use CLASSICAL SANSKRIT (संस्कृतम्) — proper case (विभक्ति), verb conjugations like अहं गच्छामि / सः अपश्यत् / ते गमिष्यन्ति, sandhi and visarga marks. Never substitute Hindi.\n"
+        "6. For Tamil/Telugu/Bengali/Kannada/Malayalam/Punjabi/Gujarati/Urdu/Arabic/Japanese/Chinese — use that language's authentic script and grammar.\n"
+        "Output JSON ONLY."
     ),
     "translate": (
         "Translate the following text to {target_language}. Preserve tone and meaning. "
@@ -522,6 +545,30 @@ def _format_prompt(tool: str, options: Dict[str, Any]) -> str:
         return template
 
 
+_JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def _safe_parse_json(raw: str) -> Optional[Dict[str, Any]]:
+    """Try to extract a JSON object from raw LLM output. Tolerates ```json fences and trailing prose."""
+    if not raw:
+        return None
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`").strip()
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:].strip()
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        match = _JSON_BLOCK_RE.search(cleaned)
+        if not match:
+            return None
+        try:
+            return json.loads(match.group(0))
+        except Exception:
+            return None
+
+
 def _parse_numbered_list(raw: str) -> List[str]:
     lines = [ln.strip() for ln in raw.split("\n") if ln.strip()]
     items = []
@@ -559,14 +606,19 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
 
     multi_tools = {"smart_reply", "paraphrase", "continue", "summarize", "synonyms"}
-    if req.tool in multi_tools:
+    data: Optional[Dict[str, Any]] = None
+    if req.tool == "vocab":
+        data = _safe_parse_json(raw)
+        # Keep suggestions as the raw text fallback; UI prefers `data` when present.
+        suggestions = [raw]
+    elif req.tool in multi_tools:
         suggestions = _parse_numbered_list(raw)
         if req.tool == "synonyms" and len(suggestions) == 1 and "," in suggestions[0]:
             suggestions = [s.strip() for s in suggestions[0].split(",") if s.strip()]
     else:
         suggestions = [raw]
 
-    return AIToolResponse(tool=req.tool, original=req.text, suggestions=suggestions)
+    return AIToolResponse(tool=req.tool, original=req.text, suggestions=suggestions, data=data)
 
 
 # =====================================================

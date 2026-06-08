@@ -64,7 +64,7 @@ export const api = {
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST", auth: true }),
 
   tool: (tool: string, text: string, options: Record<string, any> = {}) =>
-    request<{ tool: string; original: string; suggestions: string[]; explanation?: string }>(
+    request<{ tool: string; original: string; suggestions: string[]; explanation?: string; data?: Record<string, any> | null }>(
       "/ai/tool",
       { method: "POST", body: { tool, text, options }, auth: true },
     ),
