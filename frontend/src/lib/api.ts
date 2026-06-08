@@ -133,4 +133,43 @@ export const api = {
       method: "POST",
       auth: true,
     }),
+
+  // ---------- Voice-to-text (Whisper-1) ----------
+  transcribe: async (uri: string, language?: string): Promise<{ text: string }> => {
+    const form = new FormData();
+    // React Native multipart upload — pass an object with uri/name/type
+    const filename = uri.split("/").pop() || "voice.m4a";
+    const match = /\.(\w+)$/.exec(filename);
+    const ext = (match?.[1] || "m4a").toLowerCase();
+    const mime =
+      ext === "mp3" ? "audio/mpeg"
+      : ext === "wav" ? "audio/wav"
+      : ext === "webm" ? "audio/webm"
+      : "audio/m4a";
+    form.append("audio", {
+      uri,
+      name: filename,
+      type: mime,
+    } as any);
+    if (language) form.append("language", language);
+
+    const token = await getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    // Do NOT set Content-Type; RN/fetch will set the multipart boundary itself.
+
+    const res = await fetch(`${BASE}/api/transcribe`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      const e: any = new Error(err || `Request failed: ${res.status}`);
+      e.status = res.status;
+      try { e.detail = JSON.parse(err)?.detail || err; } catch { e.detail = err; }
+      throw e;
+    }
+    return await res.json();
+  },
 };

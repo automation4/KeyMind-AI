@@ -24,6 +24,7 @@ import { useTheme } from "@/src/contexts/ThemeContext";
 import { DiffView } from "@/src/components/DiffView";
 import { AdBanner } from "@/src/components/AdBanner";
 import { UpgradePrompt } from "@/src/components/UpgradePrompt";
+import { MicButton } from "@/src/components/MicButton";
 import { VocabCard, VocabLanguage, VOCAB_LANGUAGES } from "@/src/components/VocabCard";
 import { storage } from "@/src/utils/storage";
 
@@ -280,11 +281,24 @@ export default function WriteScreen() {
               if (error) setError(null);
             }}
             multiline
-            placeholder="Paste or type your text in any language…"
+            placeholder="Paste, type, or tap the mic to dictate…"
             placeholderTextColor={COLORS.textMuted}
-            style={styles.input}
+            style={[styles.input, { paddingRight: 52 }]}
             testID="writer-textinput"
           />
+          <View style={styles.micFloater} pointerEvents="box-none">
+            <MicButton
+              size={40}
+              onTranscribe={(spoken) => {
+                setText((prev) => {
+                  if (!prev) return spoken;
+                  const sep = /[.!?…\n]\s*$/.test(prev) ? " " : prev.endsWith(" ") ? "" : " ";
+                  return prev + sep + spoken;
+                });
+                if (error) setError(null);
+              }}
+            />
+          </View>
           <View style={styles.inputFooter}>
             <Text style={styles.meta}>{wordCount} WORDS</Text>
             <View style={styles.actionRow}>
@@ -603,6 +617,12 @@ const styles = StyleSheet.create({
   inputCard: {
     backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border,
     borderRadius: RADIUS.lg, paddingHorizontal: 20, paddingVertical: 18, ...SHADOW.brutal,
+    position: "relative",
+  },
+  micFloater: {
+    position: "absolute",
+    top: 10,
+    right: 10,
   },
   input: {
     minHeight: 140,

@@ -17,6 +17,7 @@ import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
 import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
+import { MicButton } from "@/src/components/MicButton";
 import { storage } from "@/src/utils/storage";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -158,6 +159,16 @@ export default function ChatScreen() {
             style={styles.composerInput}
             multiline
             testID="chat-input"
+          />
+          <MicButton
+            size={40}
+            onTranscribe={(spoken) => {
+              setInput((prev) => {
+                if (!prev) return spoken;
+                const sep = prev.endsWith(" ") ? "" : " ";
+                return prev + sep + spoken;
+              });
+            }}
           />
           <TouchableOpacity
             style={[styles.sendBtn, (!input.trim() || busy) && { opacity: 0.5 }]}
