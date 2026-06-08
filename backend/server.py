@@ -580,7 +580,8 @@ TOOL_PROMPTS: Dict[str, str] = {
         "Format as a numbered list (1., 2., 3.) and nothing else. Match the original language."
     ),
     "vocab": (
-        "You are a multilingual vocabulary tutor. The user wants a translation/explanation in: **{target_language}**.\n"
+        "You are a multilingual vocabulary tutor / word coach. The user wants a deep breakdown of a word or short phrase, "
+        "with translations in: **{target_language}**.\n"
         "Output a STRICT JSON object only — no markdown, no code fences, no leading or trailing text — in EXACTLY this shape:\n"
         "{\n"
         "  \"word\": \"<the input word/phrase, cleaned>\",\n"
@@ -588,6 +589,13 @@ TOOL_PROMPTS: Dict[str, str] = {
         "  \"meaning_simple\": \"<one short ENGLISH sentence using ONLY everyday words a 10-year-old understands>\",\n"
         "  \"tricky_words\": [\"<any word from meaning_simple that a beginner might not know; empty list if none>\"],\n"
         "  \"meaning_translated\": \"<the simple meaning, written in {target_language}>\",\n"
+        "  \"synonyms\": [\"<3-5 common English synonyms>\"],\n"
+        "  \"antonyms\": [\"<2-4 common English antonyms; empty list if none exist>\"],\n"
+        "  \"spoken_usage\": \"<one short ENGLISH sentence showing how a native speaker would say it in conversation (informal, natural register)>\",\n"
+        "  \"spoken_usage_translated\": \"<same sentence translated into {target_language} using its native script>\",\n"
+        "  \"native_alternative\": \"<a single more natural / idiomatic word or phrase a fluent native speaker would prefer instead; if the word is already natural, suggest a stylistic upgrade>\",\n"
+        "  \"native_alternative_why\": \"<one short ENGLISH sentence explaining WHY a native would pick it>\",\n"
+        "  \"memory_tip\": \"<one short ENGLISH sentence with a mnemonic, etymology, or vivid image to help remember the word>\",\n"
         "  \"tenses\": {\n"
         "    \"past\":    {\"english\": \"<short example sentence using the word in PAST tense>\",    \"translated\": \"<same sentence in {target_language}>\"},\n"
         "    \"present\": {\"english\": \"<short example sentence using the word in PRESENT tense>\", \"translated\": \"<same sentence in {target_language}>\"},\n"
@@ -616,9 +624,11 @@ TOOL_PROMPTS: Dict[str, str] = {
         "• Japanese  → Kana + Kanji (日本語)\n"
         "• Chinese   → Simplified Hanzi (中文)\n\n"
         "OTHER RULES:\n"
-        "1. meaning_simple is ALWAYS plain English (~12 words max). tricky_words = unusual words from meaning_simple (or []).\n"
-        "2. If {target_language} is English, 'translated' fields equal meaning_simple / english tense sentence verbatim.\n"
-        "3. Verify before output: does 'meaning_translated' actually use the script listed above for {target_language}? If not, REWRITE it. Same check for each tense.translated.\n"
+        "1. meaning_simple, synonyms, antonyms, spoken_usage, native_alternative_why, memory_tip, and the 'english' tense fields are ALWAYS in plain English.\n"
+        "2. tricky_words = unusual words from meaning_simple (or []).\n"
+        "3. If {target_language} is English, 'meaning_translated', 'spoken_usage_translated', and every tense.translated equal their english counterparts verbatim.\n"
+        "4. Verify before output: does every 'translated' field use the script listed above for {target_language}? If not, REWRITE it.\n"
+        "5. If antonyms genuinely don't exist (e.g. proper nouns, technical terms), return an empty list — do NOT invent.\n"
         "Output JSON ONLY — no fences, no prose."
     ),
     "translate": (

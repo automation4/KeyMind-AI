@@ -305,35 +305,33 @@ export default function WriteScreen() {
               <TouchableOpacity
                 onPress={handleUpload}
                 disabled={ocrBusy}
-                style={[styles.smallBtn, { backgroundColor: COLORS.mint }]}
+                style={[styles.iconBtn, { backgroundColor: COLORS.mint }]}
                 testID="upload-image-btn"
+                accessibilityLabel={ocrBusy ? "Reading image" : "Upload image"}
               >
                 {ocrBusy ? (
                   <ActivityIndicator size="small" color={COLORS.text} />
                 ) : (
-                  <Ionicons name="image-outline" size={14} color={COLORS.text} />
+                  <Ionicons name="image-outline" size={20} color={COLORS.text} />
                 )}
-                <Text style={styles.smallBtnText} numberOfLines={1}>
-                  {ocrBusy ? "READING…" : "UPLOAD"}
-                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => copy(text)}
                 disabled={!text}
-                style={styles.smallBtn}
+                style={styles.iconBtn}
                 testID="copy-input-btn"
+                accessibilityLabel="Copy text"
               >
-                <Ionicons name="copy-outline" size={14} color={COLORS.text} />
-                <Text style={styles.smallBtnText} numberOfLines={1}>COPY</Text>
+                <Ionicons name="copy-outline" size={20} color={COLORS.text} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setText("")}
                 disabled={!text}
-                style={styles.smallBtn}
+                style={styles.iconBtn}
                 testID="clear-input-btn"
+                accessibilityLabel="Clear text"
               >
-                <Ionicons name="close" size={14} color={COLORS.text} />
-                <Text style={styles.smallBtnText} numberOfLines={1}>CLEAR</Text>
+                <Ionicons name="close" size={22} color={COLORS.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -635,21 +633,17 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   inputFooter: { marginTop: 12, gap: 10 },
-  actionRow: { flexDirection: "row", gap: 8 },
-  smallBtn: {
-    flex: 1,
-    flexDirection: "row",
+  actionRow: { flexDirection: "row", gap: 10, justifyContent: "flex-end" },
+  iconBtn: {
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 9,
     borderRadius: RADIUS.md,
     borderWidth: 2,
     borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
   },
-  smallBtnText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.4 },
   meta: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
 
   section: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text, marginTop: 24, marginBottom: 12 },

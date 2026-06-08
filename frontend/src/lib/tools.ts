@@ -22,7 +22,7 @@ export const TOOLS: ToolDef[] = [
     options: [{ key: "tone", label: "Tone", choices: ["Professional", "Casual", "Formal", "Friendly", "Assertive", "Polite", "Humorous"] }],
   },
   { id: "smart_reply", label: "Smart Reply", icon: "chatbubble-ellipses", description: "3 contextual reply options", accent: "yellow", multi: true },
-  { id: "vocab", label: "Vocab", icon: "book", description: "Word meaning & usage", accent: "sky" },
+  { id: "vocab", label: "Describe", icon: "book", description: "Deep word breakdown · synonyms, antonyms, memory tips & more", accent: "sky" },
   {
     id: "translate",
     label: "Translate",

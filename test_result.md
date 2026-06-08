@@ -101,3 +101,59 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Complete the "Describe" tool (renamed from "Vocab") with deep word breakdown:
+  - synonyms, antonyms, native alternate, spoken usage (English + translated),
+    memory tip, all rendered safely in the result card.
+  - Listen button on the relevant text fields so users can hear pronunciation.
+
+backend:
+  - task: "Describe (vocab) AI tool returns rich JSON schema"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/ai/tool with tool=vocab returns data with word, part_of_speech, meaning_simple, meaning_translated (native script), synonyms[], antonyms[], spoken_usage, spoken_usage_translated, native_alternative, native_alternative_why, memory_tip, tenses{past,present,future}. Script validation+retry path triggers when LLM falls back to Devanagari for Telugu/Tamil/Kannada/Malayalam/Gujarati/Punjabi/Urdu/Bengali. Verified manually with target_language=Telugu and word=resilient — Telugu script returned correctly."
+
+frontend:
+  - task: "DescribeCard (VocabCard) renders new fields with ListenButton"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/VocabCard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "VocabCard now renders synonyms (mint chips), antonyms (peach chips), spoken_usage with translated counterpart, native_alternative + why (lilac card), memory_tip (yellow card). ListenButton present on: word, simple meaning, spoken_usage (EN), spoken_usage_translated (newly added), native_alternative, memory_tip, translated meaning, and each tense (EN + translated). Tool label is 'Describe' (tools.ts), backend id remains 'vocab'."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 2
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "DescribeCard (VocabCard) renders new fields with ListenButton"
+    - "Describe (vocab) AI tool returns rich JSON schema"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Please validate the Describe tool end-to-end.
+      Backend: POST /api/ai/tool with body
+        {"tool":"vocab","text":"resilient","options":{"target_language":"Telugu"}}
+      Confirm response.data contains keys: word, part_of_speech, meaning_simple, meaning_translated (Telugu script), synonyms (array), antonyms (array), spoken_usage, spoken_usage_translated (Telugu script), native_alternative, native_alternative_why, memory_tip, tenses.{past,present,future}.{english,translated}. Also test with target_language=Tamil and Hindi to confirm script switching works.
+      Frontend: Login as guest, skip onboarding/setup, on Write screen pick the "Describe" tool (book icon), type "resilient", run it. Confirm card shows: word + LISTEN, SIMPLE MEANING + LISTEN, SYNONYMS chips, ANTONYMS chips, WHEN SPEAKING + LISTEN (English) and translated line with its own LISTEN button (NEW), NATIVE SPEAKER WOULD SAY + LISTEN, HOW TO REMEMBER + LISTEN, IN <language> + LISTEN, USAGE IN TENSES rows with LISTEN per row. Then switch language via the picker and verify translated fields re-render with the new script (no Devanagari fallback for Telugu/Tamil).
+      Credentials: /app/memory/test_credentials.md (guest path is fine).

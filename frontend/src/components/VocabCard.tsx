@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import { COLORS, FONT, RADIUS, SHADOW } from "@/src/lib/theme";
+import { ListenButton } from "@/src/components/ListenButton";
 
 export type VocabData = {
   word?: string;
@@ -17,6 +18,13 @@ export type VocabData = {
   meaning_simple?: string;
   tricky_words?: string[];
   meaning_translated?: string;
+  synonyms?: string[];
+  antonyms?: string[];
+  spoken_usage?: string;
+  spoken_usage_translated?: string;
+  native_alternative?: string;
+  native_alternative_why?: string;
+  memory_tip?: string;
   tenses?: {
     past?: { english?: string; translated?: string };
     present?: { english?: string; translated?: string };
@@ -24,7 +32,6 @@ export type VocabData = {
   };
 };
 
-// Curated list — covers Indian + popular international + Sanskrit (newly requested)
 export const VOCAB_LANGUAGES = [
   "Hindi",
   "Sanskrit",
@@ -66,12 +73,15 @@ export function VocabCard({
 
   return (
     <View style={styles.card} testID="vocab-card">
-      {/* Header: word + part of speech */}
+      {/* Header: word + listen + part of speech */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.word} testID="vocab-word">
-            {data.word || "—"}
-          </Text>
+          <View style={styles.wordRow}>
+            <Text style={styles.word} testID="vocab-word">
+              {data.word || "—"}
+            </Text>
+            {data.word ? <ListenButton text={data.word} small testID="listen-word" /> : null}
+          </View>
           {data.part_of_speech ? (
             <View style={styles.posPill}>
               <Text style={styles.posPillText}>{data.part_of_speech.toUpperCase()}</Text>
@@ -80,9 +90,14 @@ export function VocabCard({
         </View>
       </View>
 
-      {/* Meaning — simple English */}
+      {/* Simple meaning */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>SIMPLE MEANING</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionLabel}>SIMPLE MEANING</Text>
+          {data.meaning_simple ? (
+            <ListenButton text={data.meaning_simple} small testID="listen-meaning" />
+          ) : null}
+        </View>
         <Text style={styles.meaningEn} selectable>
           {data.meaning_simple || "—"}
         </Text>
@@ -103,6 +118,103 @@ export function VocabCard({
           </View>
         ) : null}
       </View>
+
+      {/* Synonyms */}
+      {data.synonyms && data.synonyms.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>SYNONYMS</Text>
+          <View style={styles.chipRow}>
+            {data.synonyms.map((s) => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => onTrickyWordPress?.(s)}
+                style={[styles.wordChip, { backgroundColor: COLORS.mint }]}
+                testID={`synonym-${s}`}
+              >
+                <Text style={styles.wordChipText}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Antonyms */}
+      {data.antonyms && data.antonyms.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ANTONYMS</Text>
+          <View style={styles.chipRow}>
+            {data.antonyms.map((a) => (
+              <TouchableOpacity
+                key={a}
+                onPress={() => onTrickyWordPress?.(a)}
+                style={[styles.wordChip, { backgroundColor: COLORS.peach }]}
+                testID={`antonym-${a}`}
+              >
+                <Text style={styles.wordChipText}>{a}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Spoken usage */}
+      {data.spoken_usage ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>WHEN SPEAKING</Text>
+            <ListenButton text={data.spoken_usage} small testID="listen-spoken" />
+          </View>
+          <Text style={styles.spokenEn} selectable>
+            “{data.spoken_usage}”
+          </Text>
+          {data.spoken_usage_translated && !loading ? (
+            <View style={styles.spokenNativeRow}>
+              <Text style={styles.spokenNative} selectable>
+                {data.spoken_usage_translated}
+              </Text>
+              <ListenButton
+                text={data.spoken_usage_translated}
+                small
+                testID="listen-spoken-translated"
+              />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Native-speaker alternative */}
+      {data.native_alternative ? (
+        <View style={[styles.section, styles.altCard]}>
+          <Text style={styles.sectionLabel}>NATIVE SPEAKER WOULD SAY</Text>
+          <View style={styles.altWordRow}>
+            <Text style={styles.altWord} selectable>
+              {data.native_alternative}
+            </Text>
+            <ListenButton text={data.native_alternative} small testID="listen-native" />
+          </View>
+          {data.native_alternative_why ? (
+            <Text style={styles.altWhy} selectable>
+              Why: {data.native_alternative_why}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Memory tip */}
+      {data.memory_tip ? (
+        <View style={[styles.section, styles.memCard]}>
+          <View style={styles.sectionHeader}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Ionicons name="bulb" size={14} color={COLORS.text} />
+              <Text style={styles.sectionLabel}>HOW TO REMEMBER</Text>
+            </View>
+            <ListenButton text={data.memory_tip} small testID="listen-mem" />
+          </View>
+          <Text style={styles.memText} selectable>
+            {data.memory_tip}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Language switcher + translated meaning */}
       <View style={styles.section}>
@@ -162,9 +274,14 @@ export function VocabCard({
             <Text style={styles.loadingText}>Translating to {language}…</Text>
           </View>
         ) : (
-          <Text style={styles.meaningNative} selectable testID="vocab-translated">
-            {data.meaning_translated || "—"}
-          </Text>
+          <View style={styles.translatedRow}>
+            <Text style={styles.meaningNative} selectable testID="vocab-translated">
+              {data.meaning_translated || "—"}
+            </Text>
+            {data.meaning_translated ? (
+              <ListenButton text={data.meaning_translated} small testID="listen-translated" />
+            ) : null}
+          </View>
         )}
       </View>
 
@@ -182,14 +299,20 @@ export function VocabCard({
                 </View>
                 <View style={{ flex: 1 }}>
                   {row.english ? (
-                    <Text style={styles.tenseEn} selectable>
-                      {row.english}
-                    </Text>
+                    <View style={styles.tenseLine}>
+                      <Text style={styles.tenseEn} selectable>
+                        {row.english}
+                      </Text>
+                      <ListenButton text={row.english} small testID={`listen-tense-${t}-en`} />
+                    </View>
                   ) : null}
                   {row.translated && !loading ? (
-                    <Text style={styles.tenseNative} selectable>
-                      {row.translated}
-                    </Text>
+                    <View style={styles.tenseLine}>
+                      <Text style={styles.tenseNative} selectable>
+                        {row.translated}
+                      </Text>
+                      <ListenButton text={row.translated} small testID={`listen-tense-${t}-tr`} />
+                    </View>
                   ) : null}
                 </View>
               </View>
@@ -213,6 +336,7 @@ const styles = StyleSheet.create({
     ...SHADOW.brutalSm,
   },
   headerRow: { flexDirection: "row", alignItems: "flex-start" },
+  wordRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
   word: { fontSize: 26, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -0.5 },
   posPill: {
     alignSelf: "flex-start", marginTop: 6,
@@ -221,8 +345,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.sky,
   },
   posPillText: { fontSize: 10, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1 },
+
   section: { gap: 8 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionLabel: { fontSize: 10, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
+
   meaningEn: { fontSize: 15, color: COLORS.text, lineHeight: 22, fontWeight: FONT.bold },
   trickyRow: {
     marginTop: 4, flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center",
@@ -234,6 +361,32 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.peach,
   },
   trickyChipText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text },
+
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  wordChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.pill,
+    borderWidth: 2, borderColor: COLORS.border,
+  },
+  wordChipText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.text },
+
+  spokenEn: { fontSize: 14, color: COLORS.text, lineHeight: 22, fontWeight: FONT.bold, fontStyle: "italic" },
+  spokenNativeRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 2 },
+  spokenNative: { flex: 1, minWidth: 180, fontSize: 14, color: COLORS.text, lineHeight: 22, fontWeight: FONT.bold, opacity: 0.85 },
+
+  altCard: {
+    padding: 12, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.border,
+    backgroundColor: COLORS.lilac,
+  },
+  altWordRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  altWord: { fontSize: 17, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -0.3 },
+  altWhy: { marginTop: 4, fontSize: 12, color: COLORS.text, lineHeight: 18, fontWeight: FONT.bold, opacity: 0.85 },
+
+  memCard: {
+    padding: 12, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.border,
+    backgroundColor: COLORS.secondary,
+  },
+  memText: { fontSize: 13, color: COLORS.text, lineHeight: 20, fontWeight: FONT.bold },
+
   translatedHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   langBtn: {
     flexDirection: "row", alignItems: "center", gap: 4,
@@ -253,7 +406,9 @@ const styles = StyleSheet.create({
   langChipTextActive: { color: COLORS.bg },
   loadingRow: { flexDirection: "row", gap: 8, alignItems: "center", paddingVertical: 6 },
   loadingText: { fontSize: 12, fontWeight: FONT.bold, color: COLORS.textMuted },
-  meaningNative: { fontSize: 16, color: COLORS.text, lineHeight: 24, fontWeight: FONT.bold },
+  translatedRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  meaningNative: { flex: 1, minWidth: 200, fontSize: 16, color: COLORS.text, lineHeight: 24, fontWeight: FONT.bold },
+
   tenseRow: {
     flexDirection: "row", gap: 10, alignItems: "flex-start",
     paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.borderSoft,
@@ -264,6 +419,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   tenseBadgeText: { fontSize: 10, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1 },
-  tenseEn: { fontSize: 13, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 19 },
-  tenseNative: { marginTop: 4, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 21, opacity: 0.85 },
+  tenseLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+  tenseEn: { flex: 1, fontSize: 13, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 19 },
+  tenseNative: { flex: 1, marginTop: 4, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 21, opacity: 0.85 },
 });
