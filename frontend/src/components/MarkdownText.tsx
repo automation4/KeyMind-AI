@@ -54,7 +54,10 @@ function tokenize(input: string): Token[] {
   if (lastIndex < input.length) {
     tokens.push({ type: "text", value: input.slice(lastIndex) });
   }
-  return tokens;
+  // Sweep any unpaired stray '*' from plain-text tokens (LLM sometimes emits dangling markers).
+  return tokens.map((t) =>
+    t.type === "text" ? { ...t, value: t.value.replace(/\*+/g, "") } : t,
+  );
 }
 
 export const MarkdownText: React.FC<Props> = ({

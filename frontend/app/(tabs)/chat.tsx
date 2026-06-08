@@ -19,16 +19,57 @@ import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
 import { MicButton } from "@/src/components/MicButton";
 import { MarkdownText, stripMarkdown } from "@/src/components/MarkdownText";
+import { VocabCard, VocabData, VocabLanguage } from "@/src/components/VocabCard";
 import { storage } from "@/src/utils/storage";
 
-type Msg = { role: "user" | "assistant"; content: string };
+const VOCAB_LANG_KEY = "keymind_vocab_lang";
+
+/**
+ * Detect when the user is asking us to "describe" a single word or short phrase.
+ * If yes, return the extracted target word/phrase. Otherwise return null.
+ *
+ * Triggers:
+ *   - One- or two-token plain input  (e.g. "indifference", "side hustle")
+ *   - "what does X mean?" / "what's X mean?" / "meaning of X" / "describe X" /
+ *     "define X" / "explain X" — for X up to 4 words
+ */
+function detectDescribeQuery(raw: string): string | null {
+  const text = raw.trim().replace(/[.?!]+$/g, "");
+  if (!text) return null;
+  // Pure word / two-word lookup (no spaces inside the word). Reject sentences.
+  const tokenCount = text.split(/\s+/).length;
+  if (tokenCount <= 2 && /^[\p{L}\p{M}'\- ]+$/u.test(text)) {
+    return text;
+  }
+  const patterns: RegExp[] = [
+    /^(?:what(?:'s| is| does)?(?: the)?(?: meaning of)?|meaning of|define|describe|explain)\s+["“'']?([\p{L}\p{M}'\- ]{2,40}?)["”'']?(?:\s+(?:mean|means))?$/iu,
+    /^([\p{L}\p{M}'\- ]{2,40}?)\s+(?:meaning|definition|means what|in (?:\w+))$/iu,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m && m[1]) {
+      const w = m[1].trim();
+      if (w.split(/\s+/).length <= 4 && w.length >= 2) return w;
+    }
+  }
+  return null;
+}
+
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  /** Rich Describe card payload (only set when triggered by a describe query). */
+  card?: VocabData;
+  /** Target language used to render the card; needed for transliteration label. */
+  cardLanguage?: VocabLanguage;
+};
 
 const QUICK_PROMPTS = [
-  "Why is this grammar correct?",
+  "Describe indifference",
+  "What does serendipity mean?",
+  "Meaning of perseverance",
   "Difference between 'affect' and 'effect'",
   "Explain present perfect tense",
-  "Examples of Hindi tenses",
-  "Make my message sound polite",
 ];
 
 export default function ChatScreen() {
@@ -36,6 +77,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [vocabLang, setVocabLang] = useState<VocabLanguage>("Hindi");
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -46,6 +88,8 @@ export default function ChatScreen() {
         await storage.setItem("keymind_chat_session", sid);
       }
       setSessionId(sid);
+      const savedLang = await storage.getItem<VocabLanguage>(VOCAB_LANG_KEY, "Hindi");
+      if (savedLang) setVocabLang(savedLang);
       try {
         const data = await api.chatHistory(sid);
         setMessages((data.messages || []) as Msg[]);
@@ -59,6 +103,33 @@ export default function ChatScreen() {
     setInput("");
     setMessages((m) => [...m, { role: "user", content: message }]);
     setBusy(true);
+
+    // Auto-detect: single word / "describe X" → fetch the rich Describe card.
+    const target = detectDescribeQuery(message);
+    if (target) {
+      try {
+        const res = await api.tool("vocab_full", target, { target_language: vocabLang });
+        const card = (res as any).data as VocabData | undefined;
+        if (card && (card.meaning_simple || card.meaning_translated)) {
+          setMessages((m) => [
+            ...m,
+            {
+              role: "assistant",
+              content: `Here's a deep breakdown of **${card.word || target}**:`,
+              card,
+              cardLanguage: vocabLang,
+            },
+          ]);
+          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+          setBusy(false);
+          return;
+        }
+        // If LLM returned a malformed/empty card, fall through to regular chat.
+      } catch {
+        // Fall back to a normal chat reply if the vocab call fails.
+      }
+    }
+
     try {
       const res = await api.chat(sessionId, message);
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
@@ -131,7 +202,14 @@ export default function ChatScreen() {
           )}
 
           {messages.map((m, i) => (
-            <View key={i} style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.aiBubble]}>
+            <View
+              key={i}
+              style={[
+                styles.bubble,
+                m.role === "user" ? styles.userBubble : styles.aiBubble,
+                m.card ? styles.cardBubble : null,
+              ]}
+            >
               {m.role === "user" ? (
                 <Text style={[styles.bubbleText, { color: COLORS.text }]}>{m.content}</Text>
               ) : (
@@ -142,7 +220,42 @@ export default function ChatScreen() {
                   selectable
                 />
               )}
-              {m.role === "assistant" && (
+              {m.card ? (
+                <View style={{ marginTop: 10 }}>
+                  <VocabCard
+                    data={m.card}
+                    language={m.cardLanguage || vocabLang}
+                    onChangeLanguage={async (lang) => {
+                      setVocabLang(lang);
+                      await storage.setItem(VOCAB_LANG_KEY, lang);
+                      // Refetch the rich card for the same word in the new language.
+                      const word = m.card?.word;
+                      if (!word) return;
+                      setBusy(true);
+                      try {
+                        const res = await api.tool("vocab_full", word, {
+                          target_language: lang,
+                        });
+                        const newCard = (res as any).data as VocabData | undefined;
+                        if (newCard) {
+                          setMessages((all) =>
+                            all.map((msg, idx) =>
+                              idx === i ? { ...msg, card: newCard, cardLanguage: lang } : msg,
+                            ),
+                          );
+                        }
+                      } catch {
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    onTrickyWordPress={(w) => {
+                      setInput(w);
+                    }}
+                  />
+                </View>
+              ) : null}
+              {m.role === "assistant" && !m.card && (
                 <View style={{ marginTop: 8 }}>
                   <ListenButton
                     text={stripMarkdown(m.content)}
@@ -218,6 +331,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border,
     marginBottom: 10, maxWidth: "92%",
   },
+  cardBubble: { maxWidth: "100%", alignSelf: "stretch", padding: 12 },
   userBubble: { alignSelf: "flex-end", backgroundColor: COLORS.secondary },
   aiBubble: { alignSelf: "flex-start", backgroundColor: COLORS.surface, ...SHADOW.brutalSm },
   bubbleText: { fontSize: 14, lineHeight: 22, color: COLORS.text, fontWeight: FONT.regular },

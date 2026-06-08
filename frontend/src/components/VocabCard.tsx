@@ -32,6 +32,11 @@ export type VocabData = {
     present?: { english?: string; translated?: string; transliterated?: string };
     future?: { english?: string; translated?: string; transliterated?: string };
   };
+  idioms_phrases?: Array<{
+    english?: string;
+    translated?: string;
+    transliterated?: string;
+  }>;
 };
 
 export const VOCAB_LANGUAGES = [
@@ -57,7 +62,7 @@ export const VOCAB_LANGUAGES = [
 export type VocabLanguage = (typeof VOCAB_LANGUAGES)[number];
 
 // Label shown above the Latin-script transliteration (Hinglish for Hindi, Tanglish for Tamil, etc.)
-function romanLabel(lang: VocabLanguage): string {
+export function romanLabel(lang: VocabLanguage): string {
   switch (lang) {
     case "Hindi":
     case "Sanskrit":
@@ -91,7 +96,7 @@ function romanLabel(lang: VocabLanguage): string {
 }
 
 // Some languages already use the Latin alphabet — no transliteration line needed.
-function needsRoman(lang: VocabLanguage): boolean {
+export function needsRoman(lang: VocabLanguage): boolean {
   return !["English", "Spanish", "French", "German"].includes(lang);
 }
 
@@ -395,6 +400,51 @@ export function VocabCard({
           })}
         </View>
       ) : null}
+
+      {/* Idioms & phrases */}
+      {Array.isArray(data.idioms_phrases) && data.idioms_phrases.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>IDIOMS &amp; PHRASES</Text>
+          {data.idioms_phrases.slice(0, 5).map((item, idx) => {
+            if (!item || (!item.english && !item.translated)) return null;
+            return (
+              <View key={idx} style={styles.idiomCard} testID={`vocab-idiom-${idx}`}>
+                {item.english ? (
+                  <View style={styles.translatedLine}>
+                    <Text style={styles.idiomEn} selectable>
+                      “{item.english}”
+                    </Text>
+                    <ListenButton
+                      text={item.english}
+                      small
+                      compact
+                      testID={`listen-idiom-${idx}-en`}
+                    />
+                  </View>
+                ) : null}
+                {item.translated && !loading ? (
+                  <View style={styles.translatedLine}>
+                    <Text style={styles.idiomNative} selectable>
+                      {item.translated}
+                    </Text>
+                    <ListenButton
+                      text={item.translated}
+                      small
+                      compact
+                      testID={`listen-idiom-${idx}-tr`}
+                    />
+                  </View>
+                ) : null}
+                {item.transliterated && needsRoman(language) && !loading ? (
+                  <Text style={styles.idiomTranslit} selectable>
+                    {item.transliterated}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -527,4 +577,16 @@ const styles = StyleSheet.create({
   tenseEn: { flex: 1, minWidth: 0, fontSize: 13, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 19 },
   tenseNative: { flex: 1, minWidth: 0, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 21, opacity: 0.85 },
   tenseTranslit: { fontSize: 12, color: COLORS.textMuted, fontWeight: FONT.bold, lineHeight: 18, fontStyle: "italic" },
+
+  idiomCard: {
+    padding: 10,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.sky,
+    gap: 6,
+  },
+  idiomEn: { flex: 1, minWidth: 0, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 21, fontStyle: "italic" },
+  idiomNative: { flex: 1, minWidth: 0, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 21, opacity: 0.9 },
+  idiomTranslit: { fontSize: 12, color: COLORS.textMuted, fontWeight: FONT.bold, lineHeight: 18, fontStyle: "italic" },
 });

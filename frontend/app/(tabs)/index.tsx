@@ -25,7 +25,8 @@ import { DiffView } from "@/src/components/DiffView";
 import { AdBanner } from "@/src/components/AdBanner";
 import { UpgradePrompt } from "@/src/components/UpgradePrompt";
 import { MicButton } from "@/src/components/MicButton";
-import { VocabCard, VocabLanguage, VOCAB_LANGUAGES } from "@/src/components/VocabCard";
+import { VocabLanguage, VOCAB_LANGUAGES } from "@/src/components/VocabCard";
+import { SimpleDescribeCard } from "@/src/components/SimpleDescribeCard";
 import { storage } from "@/src/utils/storage";
 
 const accentBg: Record<string, string> = {
@@ -402,11 +403,11 @@ export default function WriteScreen() {
               {TOOL_BY_ID[result.tool]?.label?.toUpperCase() || "RESULT"}
             </Text>
             {result.tool === "vocab" && result.data ? (
-              <VocabCard
+              <SimpleDescribeCard
                 data={result.data}
                 language={vocabLang}
                 loading={vocabReloading}
-                onChangeLanguage={async (lang) => {
+                onLanguageChange={async (lang) => {
                   setVocabLang(lang);
                   await storage.setItem(VOCAB_LANG_KEY, lang);
                   if (!text.trim() || vocabReloading) return;
@@ -431,10 +432,6 @@ export default function WriteScreen() {
                   } finally {
                     setVocabReloading(false);
                   }
-                }}
-                onTrickyWordPress={(w) => {
-                  setText(w);
-                  runTool("vocab", { target_language: vocabLang });
                 }}
               />
             ) : (

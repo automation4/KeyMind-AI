@@ -580,7 +580,26 @@ TOOL_PROMPTS: Dict[str, str] = {
         "Format as a numbered list (1., 2., 3.) and nothing else. Match the original language."
     ),
     "vocab": (
-        "You are a multilingual vocabulary tutor / word coach. The user wants a deep breakdown of a word or short phrase, "
+        "You are a concise multilingual word explainer. The user wants a SHORT explanation of a single word "
+        "or short phrase, plus a translation in **{target_language}**.\n"
+        "Output a STRICT JSON object ONLY — no markdown, no code fences, no leading/trailing text:\n"
+        "{\n"
+        "  \"word\": \"<the input word/phrase, cleaned>\",\n"
+        "  \"part_of_speech\": \"<noun | verb | adjective | adverb | idiom | phrase | other>\",\n"
+        "  \"meaning_simple\": \"<one or two short ENGLISH sentences explaining the word using everyday vocabulary a 10-year-old understands>\",\n"
+        "  \"meaning_translated\": \"<the same simple explanation, written in {target_language} using its NATIVE script>\",\n"
+        "  \"meaning_transliterated\": \"<meaning_translated written ONLY in the Latin (English) alphabet — Hinglish / Tanglish / Tenglish / Banglish / Romaji / Pinyin etc. EMPTY STRING if target_language is already Latin (English/Spanish/French/German).>\"\n"
+        "}\n"
+        "CRITICAL SCRIPT RULE:\n"
+        "→ 'meaning_translated' MUST be written in the NATIVE SCRIPT of {target_language}.\n"
+        "→ Tamil→Tamil, Telugu→Telugu, Bengali→Bengali, Kannada→Kannada, Malayalam→Malayalam, Gujarati→Gujarati, Punjabi→Gurmukhi, Urdu→Nastaliq, Hindi/Sanskrit/Marathi→Devanagari.\n"
+        "→ DO NOT default to Hindi/Devanagari unless target is Hindi/Sanskrit/Marathi.\n"
+        "→ If target_language is English: meaning_translated == meaning_simple verbatim; meaning_transliterated = \"\".\n"
+        "→ Transliterated MUST contain ONLY a-z A-Z and basic punctuation.\n"
+        "Output JSON ONLY."
+    ),
+    "vocab_full": (
+        "You are a multilingual vocabulary tutor / word coach. The user wants a DEEP breakdown of a word or short phrase, "
         "with translations in: **{target_language}**.\n"
         "Output a STRICT JSON object only — no markdown, no code fences, no leading or trailing text — in EXACTLY this shape:\n"
         "{\n"
@@ -589,12 +608,12 @@ TOOL_PROMPTS: Dict[str, str] = {
         "  \"meaning_simple\": \"<one short ENGLISH sentence using ONLY everyday words a 10-year-old understands>\",\n"
         "  \"tricky_words\": [\"<any word from meaning_simple that a beginner might not know; empty list if none>\"],\n"
         "  \"meaning_translated\": \"<the simple meaning, written in {target_language}>\",\n"
-        "  \"meaning_transliterated\": \"<meaning_translated written ONLY in the Latin (English) alphabet so a learner can pronounce it — e.g. Hindi 'किसी चीज़ की हूबहू नकल बनाना' → 'Kisi cheez ki hubahu nakal banana'. EMPTY STRING if target_language already uses Latin script (English/Spanish/French/German).>\",\n"
+        "  \"meaning_transliterated\": \"<meaning_translated written ONLY in the Latin (English) alphabet. EMPTY STRING if target_language already uses Latin script.>\",\n"
         "  \"synonyms\": [\"<3-5 common English synonyms>\"],\n"
         "  \"antonyms\": [\"<2-4 common English antonyms; empty list if none exist>\"],\n"
         "  \"spoken_usage\": \"<one short ENGLISH sentence showing how a native speaker would say it in conversation (informal, natural register)>\",\n"
         "  \"spoken_usage_translated\": \"<same sentence translated into {target_language} using its native script>\",\n"
-        "  \"spoken_usage_transliterated\": \"<spoken_usage_translated written ONLY in the Latin alphabet — phonetic Hinglish/Tanglish/Tenglish/Banglish/Pinyin/Romaji etc. EMPTY STRING if target_language is already Latin.>\",\n"
+        "  \"spoken_usage_transliterated\": \"<spoken_usage_translated written ONLY in the Latin alphabet. EMPTY STRING if target_language is already Latin.>\",\n"
         "  \"native_alternative\": \"<a single more natural / idiomatic word or phrase a fluent native speaker would prefer instead; if the word is already natural, suggest a stylistic upgrade>\",\n"
         "  \"native_alternative_why\": \"<one short ENGLISH sentence explaining WHY a native would pick it>\",\n"
         "  \"memory_tip\": \"<one short ENGLISH sentence with a mnemonic, etymology, or vivid image to help remember the word>\",\n"
@@ -602,8 +621,14 @@ TOOL_PROMPTS: Dict[str, str] = {
         "    \"past\":    {\"english\": \"<PAST tense example>\",    \"translated\": \"<same in {target_language} native script>\", \"transliterated\": \"<same in Latin alphabet; empty if Latin>\"},\n"
         "    \"present\": {\"english\": \"<PRESENT tense example>\", \"translated\": \"<same in {target_language} native script>\", \"transliterated\": \"<same in Latin alphabet; empty if Latin>\"},\n"
         "    \"future\":  {\"english\": \"<FUTURE tense example>\",  \"translated\": \"<same in {target_language} native script>\", \"transliterated\": \"<same in Latin alphabet; empty if Latin>\"}\n"
-        "  }\n"
+        "  },\n"
+        "  \"idioms_phrases\": [\n"
+        "    {\"english\": \"<a SHORT real-world ENGLISH sentence (≤15 words) that uses the word, or a popular ENGLISH idiom/phrase containing it. Pick ones that show flavour: workplace, casual chat, news headline, etc.>\",\n"
+        "     \"translated\": \"<same sentence in {target_language} native script>\",\n"
+        "     \"transliterated\": \"<same sentence in Latin alphabet; EMPTY STRING if {target_language} is already Latin>\"}\n"
+        "  ]\n"
         "}\n"
+        "Aim for 3 entries in 'idioms_phrases' covering different registers (formal, casual, idiomatic). If genuine idioms don't exist for the word, use 3 distinct natural sentences instead.\n\n"
         "CRITICAL SCRIPT RULE (read TWICE before answering):\n"
         "→ Every 'translated' field MUST be written in the NATIVE SCRIPT of {target_language}.\n"
         "→ DO NOT default to Hindi/Devanagari unless target_language is exactly 'Hindi' or 'Sanskrit'.\n"
@@ -626,12 +651,12 @@ TOOL_PROMPTS: Dict[str, str] = {
         "• Japanese  → Kana + Kanji (日本語)\n"
         "• Chinese   → Simplified Hanzi (中文)\n\n"
         "OTHER RULES:\n"
-        "1. meaning_simple, synonyms, antonyms, spoken_usage, native_alternative_why, memory_tip, and the 'english' tense fields are ALWAYS in plain English.\n"
+        "1. meaning_simple, synonyms, antonyms, spoken_usage, native_alternative_why, memory_tip, and the 'english' tense/idiom fields are ALWAYS in plain English.\n"
         "2. tricky_words = unusual words from meaning_simple (or []).\n"
-        "3. If {target_language} is English, 'meaning_translated', 'spoken_usage_translated', and every tense.translated equal their english counterparts verbatim; transliterated fields are EMPTY STRINGS.\n"
-        "4. If {target_language} is Spanish, French, German, or any other Latin-script language: transliterated fields MUST be EMPTY STRINGS (the translated text is already Latin).\n"
-        "5. For ALL non-Latin languages (Hindi, Sanskrit, Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Urdu, Arabic, Japanese, Chinese): every transliterated field MUST be a phonetic Latin-alphabet rendering — readable for English speakers. Use the popular romanization: Hinglish for Hindi/Marathi/Sanskrit, Tanglish for Tamil, Tenglish for Telugu, Banglish for Bengali, Punjabi-Roman for Punjabi, Roman-Urdu for Urdu, Romanized Arabic for Arabic, Romaji for Japanese, Pinyin (with tone marks ok) for Chinese.\n"
-        "6. Verify before output: does every 'translated' field use the script listed above for {target_language}? If not, REWRITE it. Does every 'transliterated' field use ONLY Latin letters (a-z, A-Z, basic punctuation, spaces)? If it contains any non-Latin character, REWRITE.\n"
+        "3. If {target_language} is English, every 'translated' field equals its 'english' counterpart verbatim; transliterated fields are EMPTY STRINGS.\n"
+        "4. If {target_language} is Spanish, French, German, or any other Latin-script language: transliterated fields MUST be EMPTY STRINGS.\n"
+        "5. For ALL non-Latin languages: every transliterated field MUST be a phonetic Latin-alphabet rendering. Use Hinglish for Hindi/Marathi/Sanskrit, Tanglish for Tamil, Tenglish for Telugu, Banglish for Bengali, Punjabi-Roman for Punjabi, Roman-Urdu for Urdu, Romanized Arabic for Arabic, Romaji for Japanese, Pinyin for Chinese.\n"
+        "6. Verify before output: every 'translated' uses the correct script; every 'transliterated' uses ONLY Latin characters.\n"
         "7. If antonyms genuinely don't exist (e.g. proper nouns, technical terms), return an empty list — do NOT invent.\n"
         "Output JSON ONLY — no fences, no prose."
     ),
@@ -838,7 +863,7 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
 
     multi_tools = {"smart_reply", "paraphrase", "continue", "summarize", "synonyms"}
     data: Optional[Dict[str, Any]] = None
-    if req.tool == "vocab":
+    if req.tool in ("vocab", "vocab_full"):
         data = _safe_parse_json(raw)
         target_lang = (req.options or {}).get("target_language", "English")
         # Script validation: Gemini sometimes ignores the target language for

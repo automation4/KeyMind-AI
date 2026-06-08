@@ -109,7 +109,7 @@ user_problem_statement: |
   - Listen button on the relevant text fields so users can hear pronunciation.
 
 backend:
-  - task: "Describe (vocab) AI tool returns rich JSON schema"
+  - task: "vocab tool: SLIM schema for Describe Write tab"
     implemented: true
     working: true
     file: "/app/backend/server.py"
@@ -119,7 +119,108 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Schema now also includes meaning_transliterated, spoken_usage_transliterated, and tenses.{past,present,future}.transliterated — Latin-alphabet phonetic readings (Hinglish/Tanglish/Tenglish/Banglish/Romaji/Pinyin/etc.). For Latin-script targets (English/Spanish/French/German) these MUST be empty strings. Verified manually with target_language=Hindi (Hinglish populated) and target_language=Telugu (Tenglish populated)."
+        comment: "POST /api/ai/tool with tool=vocab now returns ONLY {word, part_of_speech, meaning_simple, meaning_translated, meaning_transliterated}. Used by the simplified Describe Write tab. Faster + cheaper than vocab_full. Script-validation retry still applies. Verified manually for Hindi."
+
+  - task: "vocab_full tool: rich schema + idioms_phrases for Chat"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/ai/tool with tool=vocab_full returns the previous rich payload (synonyms, antonyms, native_alternative, native_alternative_why, memory_tip, spoken_usage*, tenses) PLUS a NEW idioms_phrases array [{english, translated, transliterated}] with 3 entries covering formal/casual/idiomatic registers. Verified manually with target_language=Hindi (idioms in Devanagari + Hinglish populated)."
+
+frontend:
+  - task: "Write tab Describe — slim card only"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/SimpleDescribeCard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "New SimpleDescribeCard component renders ONLY the word + part-of-speech pill + SIMPLE EXPLANATION + IN <LANG> translated meaning + romanized transliteration block + LISTEN buttons. Language picker chevron toggles a horizontal scroll chip row. (tabs)/index.tsx now imports SimpleDescribeCard and uses it for tool='vocab'; the old rich VocabCard is no longer imported there."
+
+  - task: "Chat tab — auto-detect describe queries and render rich VocabCard inline"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/chat.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added detectDescribeQuery() heuristic: triggers on (a) 1–2 token plain inputs that contain only letters (e.g. 'indifference', 'side hustle') OR (b) patterns like 'what does X mean', 'meaning of X', 'describe X', 'define X', 'explain X' where X is up to 4 words. When matched, send() calls POST /api/ai/tool with tool=vocab_full instead of /api/ai/chat. The resulting Msg carries a card:VocabData and renders the full VocabCard (synonyms, antonyms, native alternative, memory tip, spoken_usage, tenses, idioms_phrases) INSIDE the assistant bubble — language picker, LISTEN buttons, and transliteration all work. Quick-prompt chips updated to surface the new flow ('Describe indifference', 'What does serendipity mean?', 'Meaning of perseverance'). Card bubble uses maxWidth: '100%' to give the full-width grid more room."
+
+  - task: "VocabCard idioms_phrases section"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/VocabCard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "New IDIOMS & PHRASES section renders below the tenses table. Up to 5 entries shown, each in a sky-coloured card with English (italic) + native-script translation + Latin transliteration. Compact LISTEN buttons on both English and translated lines. Hidden if idioms_phrases is empty or undefined."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.2"
+  test_sequence: 3
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Write tab Describe — slim card only"
+    - "Chat tab — auto-detect describe queries and render rich VocabCard inline"
+    - "VocabCard idioms_phrases section"
+    - "vocab_full tool: rich schema + idioms_phrases for Chat"
+    - "vocab tool: SLIM schema for Describe Write tab"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Validate the Describe-into-Chat transfer + slim Describe Write tab.
+
+      BACKEND:
+        1) POST /api/ai/tool body {"tool":"vocab","text":"resilient","options":{"target_language":"Hindi"}}
+           → response.data MUST contain ONLY: word, part_of_speech, meaning_simple, meaning_translated (Devanagari), meaning_transliterated (Hinglish).
+           → response.data MUST NOT contain: synonyms, antonyms, tenses, idioms_phrases, native_alternative.
+        2) POST /api/ai/tool body {"tool":"vocab_full","text":"indifference","options":{"target_language":"Hindi"}}
+           → response.data MUST contain all the previous rich keys PLUS idioms_phrases (array length >= 1) where each item has english/translated/transliterated.
+        3) Repeat (2) with target_language=Telugu — idioms_phrases.translated must be Telugu script and transliterated must be Tenglish (Latin only).
+
+      FRONTEND:
+        WRITE TAB (Describe tool):
+          - Open the Describe tool, type "resilient", run. Confirm the new SimpleDescribeCard renders ONLY: word, part-of-speech pill, SIMPLE EXPLANATION (with LISTEN), IN HINDI section (with translated + LISTEN + HINGLISH italic line). Confirm there is NO synonyms / antonyms / tenses / idioms / memory tip section anywhere on this card.
+          - Tap the chevron next to "IN HINDI" → language picker chip row expands. Tap "Telugu" → card reloads, IN TELUGU + TENGLISH appear; no synonyms etc.
+
+        CHAT TAB (auto-detect):
+          - Open the Chat tab. The quick-prompt chips should now include "Describe indifference", "What does serendipity mean?", "Meaning of perseverance".
+          - Tap "Describe indifference" → an assistant bubble appears containing a SHORT text intro plus the full VocabCard inline. Card MUST include: word + LISTEN, part-of-speech, SIMPLE MEANING + LISTEN, SYNONYMS chips, ANTONYMS chips, WHEN SPEAKING (EN + translated + transliteration), NATIVE SPEAKER WOULD SAY, HOW TO REMEMBER, IN HINDI + transliteration, USAGE IN TENSES grid, and a NEW "IDIOMS & PHRASES" section with sky-blue cards each having English italic + Devanagari + Hinglish + LISTEN buttons.
+          - Type "indifference" alone (no command) and send → same rich card appears (single-word auto-detect).
+          - Type "Difference between affect and effect" → this is a sentence — regular chat reply (no card).
+          - Inside the chat card, tap the language picker, switch to Telugu → card refetches; everything (including idioms) re-renders in Telugu + Tenglish.
+
+      Files to skim:
+        - /app/backend/server.py (vocab + vocab_full prompts around lines 562–680)
+        - /app/frontend/src/components/SimpleDescribeCard.tsx (new)
+        - /app/frontend/src/components/VocabCard.tsx (idioms section at the end)
+        - /app/frontend/app/(tabs)/chat.tsx (detectDescribeQuery + send + render)
+        - /app/frontend/app/(tabs)/index.tsx (now imports SimpleDescribeCard for the vocab branch)
+
+      Mocked APIs: None. Gemini 3 Flash + OpenAI TTS via Emergent LLM Key.
+      Credentials: guest path OK. /app/memory/test_credentials.md exists.
 
 frontend:
   - task: "DescribeCard renders transliteration + fixes tense alignment"
