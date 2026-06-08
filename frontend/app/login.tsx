@@ -34,6 +34,31 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // Hidden admin gesture: 11 quick taps on the KM logo.
+  const tapCountRef = React.useRef(0);
+  const tapResetRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onLogoTap = () => {
+    if (showEmail) return;
+    if (tapResetRef.current) clearTimeout(tapResetRef.current);
+    tapCountRef.current += 1;
+    if (tapCountRef.current >= 11) {
+      tapCountRef.current = 0;
+      setShowEmail(true);
+      return;
+    }
+    // Reset if user pauses > 1.2s between taps
+    tapResetRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 1200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (tapResetRef.current) clearTimeout(tapResetRef.current);
+    };
+  }, []);
+
   const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL;
 
   useEffect(() => {
@@ -164,9 +189,15 @@ export default function Login() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View style={styles.logoBlock}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={onLogoTap}
+              style={styles.logoBlock}
+              accessibilityLabel="KeyMind logo"
+              testID="login-logo"
+            >
               <Text style={styles.logoText}>KM</Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.body}>
@@ -209,17 +240,13 @@ export default function Login() {
               )}
             </TouchableOpacity>
 
-            {/* Email entry — hidden until tapped. Reveals password only if admin email. */}
-            {!showEmail ? (
-              <TouchableOpacity
-                onPress={() => setShowEmail(true)}
-                style={styles.emailLink}
-                testID="show-email-login"
-              >
-                <Text style={styles.emailLinkText}>Sign in with email</Text>
-              </TouchableOpacity>
-            ) : (
+            {/* Hidden admin form — revealed via 11 taps on KM logo. No visible toggle. */}
+            {showEmail && (
               <View style={styles.emailForm}>
+                <View style={styles.adminBadgeRow}>
+                  <Ionicons name="shield-checkmark" size={14} color={COLORS.text} />
+                  <Text style={styles.adminBadgeText}>ADMIN ACCESS</Text>
+                </View>
                 <Text style={styles.fieldLabel}>EMAIL</Text>
                 <TextInput
                   value={email}
@@ -346,12 +373,18 @@ const styles = StyleSheet.create({
   },
   guestBtnText: { fontSize: 14, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.bg },
   btnDisabled: { opacity: 0.6 },
-  emailLink: { marginTop: 18, alignSelf: "center", paddingVertical: 6 },
-  emailLinkText: { fontSize: 13, color: COLORS.textMuted, fontWeight: FONT.bold, textDecorationLine: "underline" },
   emailForm: {
     marginTop: 18, padding: 14, borderRadius: RADIUS.lg,
     borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surface,
   },
+  adminBadgeRow: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+    backgroundColor: COLORS.secondary, borderWidth: 2, borderColor: COLORS.border,
+    marginBottom: 10,
+  },
+  adminBadgeText: { fontSize: 10, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1.2 },
   fieldLabel: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted, marginBottom: 6 },
   input: {
     backgroundColor: COLORS.bg,

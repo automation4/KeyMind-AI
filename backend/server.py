@@ -26,7 +26,7 @@ EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
 
 # Admin credentials (single-admin app)
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "himthegreat@gmail.com").lower().strip()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "auto")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "aa$fufm2q")
 
 # Free-tier daily AI usage limit (any tool, any combination)
 FREE_TOOL_DAILY_LIMIT = int(os.environ.get("FREE_TOOL_DAILY_LIMIT", "5"))

@@ -255,7 +255,7 @@ export default function WriteScreen() {
                 {ocrBusy ? (
                   <ActivityIndicator size="small" color={COLORS.text} />
                 ) : (
-                  <Ionicons name="image-outline" size={14} color={COLORS.text} />
+                  <Ionicons name="image-outline" size={15} color={COLORS.text} />
                 )}
                 <Text style={styles.smallBtnText}>{ocrBusy ? "READING…" : "UPLOAD"}</Text>
               </TouchableOpacity>
@@ -265,7 +265,7 @@ export default function WriteScreen() {
                 style={styles.smallBtn}
                 testID="copy-input-btn"
               >
-                <Ionicons name="copy-outline" size={14} color={COLORS.text} />
+                <Ionicons name="copy-outline" size={15} color={COLORS.text} />
                 <Text style={styles.smallBtnText}>COPY</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -274,7 +274,7 @@ export default function WriteScreen() {
                 style={styles.smallBtn}
                 testID="clear-input-btn"
               >
-                <Ionicons name="close-circle-outline" size={14} color={COLORS.text} />
+                <Ionicons name="close" size={15} color={COLORS.text} />
                 <Text style={styles.smallBtnText}>CLEAR</Text>
               </TouchableOpacity>
             </View>
@@ -428,7 +428,10 @@ export default function WriteScreen() {
               })}
             </ScrollView>
             <TouchableOpacity
-              style={[styles.sheetBtn, { backgroundColor: COLORS.surface, marginTop: 12 }]}
+              style={[
+                styles.sheetBtn,
+                { backgroundColor: COLORS.surface, marginTop: 12, flex: 0 },
+              ]}
               onPress={() => setToolPickerOpen(false)}
               testID="tool-picker-close-btn"
             >
@@ -604,7 +607,8 @@ const styles = StyleSheet.create({
   optChipText: { fontSize: 13, fontWeight: FONT.bold, color: COLORS.text },
   optChipTextActive: { color: COLORS.bg },
   sheetBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: RADIUS.lg, alignItems: "center",
+    flex: 1, paddingVertical: 14, borderRadius: RADIUS.lg,
+    alignItems: "center", justifyContent: "center",
     borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
   },
   sheetBtnText: { fontSize: 13, fontWeight: FONT.black, letterSpacing: 1.5 },
