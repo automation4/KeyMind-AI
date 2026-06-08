@@ -117,4 +117,20 @@ export const api = {
       method: "DELETE",
       auth: true,
     }),
+
+  // ---------- Subscription (mock payment) ----------
+  listPlans: () =>
+    request<{
+      plans: { id: string; label: string; price_inr: number; days: number; currency: string }[];
+    }>("/subscription/plans"),
+  subscribe: (plan: "weekly" | "monthly") =>
+    request<{ ok: boolean; mock_payment: boolean; plan: string; expires_at: string; user: any }>(
+      "/subscription/subscribe",
+      { method: "POST", body: { plan }, auth: true },
+    ),
+  cancelSubscription: () =>
+    request<{ ok: boolean; user: any }>("/subscription/cancel", {
+      method: "POST",
+      auth: true,
+    }),
 };

@@ -128,6 +128,17 @@ class WhitelistToggle(BaseModel):
     is_premium: bool
 
 
+class SubscribeRequest(BaseModel):
+    plan: str  # "weekly" or "monthly"
+
+
+# Mock subscription pricing — INR. Real payment integration TBD.
+SUBSCRIPTION_PLANS: Dict[str, Dict[str, Any]] = {
+    "weekly":  {"label": "Weekly",  "price_inr": 250, "days": 7},
+    "monthly": {"label": "Monthly", "price_inr": 800, "days": 30},
+}
+
+
 # =====================================================
 # Helpers
 # =====================================================
@@ -135,29 +146,68 @@ def _today_str() -> str:
     return date.today().isoformat()
 
 
+def _parse_dt(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            return None
+    return None
+
+
+def _subscription_active(user: Dict[str, Any]) -> bool:
+    exp = _parse_dt(user.get("subscription_expires_at"))
+    return bool(exp and exp > datetime.now(timezone.utc))
+
+
 async def _ensure_whitelist_sync(user: Dict[str, Any]) -> Dict[str, Any]:
-    """Reflect whitelist + admin flags onto the user doc if needed."""
+    """Compute effective is_premium and is_admin from:
+       (a) hardcoded admin email,
+       (b) admin whitelist entry,
+       (c) active paid subscription.
+    Persist if it diverges from the stored doc.
+    """
     email = (user.get("email") or "").lower().strip()
     is_admin = email == ADMIN_EMAIL
     wl = await db.whitelist.find_one({"email": email}, {"_id": 0})
-    is_premium = bool(wl and wl.get("is_premium")) or is_admin
-    if user.get("is_admin") != is_admin or user.get("is_premium") != is_premium:
-        await db.users.update_one(
-            {"user_id": user["user_id"]},
-            {"$set": {"is_admin": is_admin, "is_premium": is_premium}},
-        )
-        user["is_admin"] = is_admin
-        user["is_premium"] = is_premium
+    admin_granted = bool(wl and wl.get("is_premium"))
+    sub_active = _subscription_active(user)
+    is_premium = is_admin or admin_granted or sub_active
+
+    updates: Dict[str, Any] = {}
+    if user.get("is_admin") != is_admin:
+        updates["is_admin"] = is_admin
+    if user.get("is_premium") != is_premium:
+        updates["is_premium"] = is_premium
+    if updates:
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": updates})
+        user.update(updates)
+
+    # Stash computed sources for the public projection (not persisted).
+    user["_admin_granted"] = admin_granted
+    user["_subscription_active"] = sub_active
     return user
 
 
 def _user_public(user: Dict[str, Any]) -> Dict[str, Any]:
-    """Public projection of a user document — includes usage info."""
+    """Public projection of a user document — includes usage + subscription info."""
     today = _today_str()
     usage_date = user.get("tool_usage_date")
     usage_count = int(user.get("tool_usage_count") or 0) if usage_date == today else 0
     is_premium = bool(user.get("is_premium") or user.get("is_admin"))
     limit = FREE_TOOL_DAILY_LIMIT
+    # Premium source for UI labelling: "admin" | "subscription" | None
+    source: Optional[str] = None
+    if user.get("is_admin") or user.get("_admin_granted"):
+        source = "admin"
+    elif user.get("_subscription_active"):
+        source = "subscription"
+    exp = _parse_dt(user.get("subscription_expires_at"))
     return {
         "user_id": user.get("user_id"),
         "email": user.get("email"),
@@ -166,6 +216,9 @@ def _user_public(user: Dict[str, Any]) -> Dict[str, Any]:
         "is_guest": bool(user.get("is_guest")),
         "is_admin": bool(user.get("is_admin")),
         "is_premium": is_premium,
+        "premium_source": source,
+        "subscription_plan": user.get("subscription_plan"),
+        "subscription_expires_at": exp.isoformat() if exp else None,
         "tool_uses_today": usage_count,
         "tool_uses_limit": limit,
         "tool_uses_remaining": max(0, limit - usage_count) if not is_premium else None,
@@ -435,8 +488,74 @@ async def admin_remove_whitelist(email: str, authorization: Optional[str] = Head
     await require_admin(authorization)
     email = email.lower().strip()
     res = await db.whitelist.delete_one({"email": email})
-    await db.users.update_one({"email": email}, {"$set": {"is_premium": False}})
+    # Only clear is_premium if the user has no active paid subscription.
+    target = await db.users.find_one({"email": email}, {"_id": 0})
+    if target and not _subscription_active(target):
+        await db.users.update_one({"email": email}, {"$set": {"is_premium": False}})
     return {"deleted": res.deleted_count}
+
+
+# =====================================================
+# Subscription (mock payment)
+# =====================================================
+@api.get("/subscription/plans")
+async def list_plans():
+    """Public — pricing screen calls this to render plan cards."""
+    return {
+        "plans": [
+            {"id": pid, **info, "currency": "INR"}
+            for pid, info in SUBSCRIPTION_PLANS.items()
+        ]
+    }
+
+
+@api.post("/subscription/subscribe")
+async def subscribe(body: SubscribeRequest, authorization: Optional[str] = Header(None)):
+    """MOCK PAYMENT: instantly activates a subscription. No real gateway call.
+    Extends the existing expiry by `days` if the user is already subscribed.
+    """
+    user = await get_current_user(authorization)
+    plan = (body.plan or "").lower().strip()
+    if plan not in SUBSCRIPTION_PLANS:
+        raise HTTPException(status_code=400, detail="Invalid plan")
+    info = SUBSCRIPTION_PLANS[plan]
+    now = datetime.now(timezone.utc)
+    current_exp = _parse_dt(user.get("subscription_expires_at"))
+    base = current_exp if (current_exp and current_exp > now) else now
+    new_exp = base + timedelta(days=info["days"])
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "subscription_plan": plan,
+            "subscription_expires_at": new_exp.isoformat(),
+            "is_premium": True,
+        }},
+    )
+    user["subscription_plan"] = plan
+    user["subscription_expires_at"] = new_exp.isoformat()
+    user["is_premium"] = True
+    user = await _ensure_whitelist_sync(user)
+    return {
+        "ok": True,
+        "mock_payment": True,
+        "plan": plan,
+        "expires_at": new_exp.isoformat(),
+        "user": _user_public(user),
+    }
+
+
+@api.post("/subscription/cancel")
+async def cancel_subscription(authorization: Optional[str] = Header(None)):
+    """Immediately ends the user's subscription. Admin-whitelisted users keep premium."""
+    user = await get_current_user(authorization)
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"subscription_plan": None, "subscription_expires_at": None}},
+    )
+    user["subscription_plan"] = None
+    user["subscription_expires_at"] = None
+    user = await _ensure_whitelist_sync(user)
+    return {"ok": True, "user": _user_public(user)}
 
 
 # =====================================================

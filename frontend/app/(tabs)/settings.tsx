@@ -158,7 +158,9 @@ export default function SettingsScreen() {
               )}
               {isPremium && !isAdmin && (
                 <View style={[styles.pill, { backgroundColor: COLORS.mint }]}>
-                  <Text style={styles.pillText}>AD-FREE</Text>
+                  <Text style={styles.pillText}>
+                    {user?.premium_source === "admin" ? "AD-FREE" : "PREMIUM"}
+                  </Text>
                 </View>
               )}
             </View>
@@ -191,6 +193,42 @@ export default function SettingsScreen() {
               Resets daily at midnight UTC · All features included.
             </Text>
           </View>
+        )}
+
+        {/* Premium CTA for non-premium users */}
+        {!isPremium && (
+          <TouchableOpacity
+            style={[styles.proCard, { backgroundColor: COLORS.primary }]}
+            onPress={() => router.push("/pricing")}
+            testID="settings-pricing-btn"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.proEyebrow}>UNLIMITED & AD-FREE</Text>
+              <Text style={styles.proTitle}>Go Premium</Text>
+              <Text style={styles.proSub}>From ₹250/week · Cancel anytime</Text>
+            </View>
+            <Ionicons name="arrow-forward-circle" size={36} color={COLORS.text} />
+          </TouchableOpacity>
+        )}
+
+        {/* Manage subscription for paid users */}
+        {user?.premium_source === "subscription" && user?.subscription_expires_at && (
+          <TouchableOpacity
+            style={styles.subCard}
+            onPress={() => router.push("/pricing")}
+            testID="settings-manage-sub"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.subEyebrow}>
+                {user.subscription_plan === "weekly" ? "WEEKLY PLAN" : "MONTHLY PLAN"} · ACTIVE
+              </Text>
+              <Text style={styles.subTitle}>Manage subscription</Text>
+              <Text style={styles.subSub}>
+                Renews / expires {new Date(user.subscription_expires_at).toLocaleDateString()}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={28} color={COLORS.text} />
+          </TouchableOpacity>
         )}
 
         {/* Admin panel */}
@@ -378,6 +416,14 @@ const styles = StyleSheet.create({
   proEyebrow: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1.5 },
   proTitle: { marginTop: 4, fontSize: 24, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -1 },
   proSub: { marginTop: 2, fontSize: 13, fontWeight: FONT.bold, color: COLORS.text },
+
+  subCard: {
+    marginTop: 16, padding: 16, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border,
+    backgroundColor: COLORS.mint, flexDirection: "row", alignItems: "center", ...SHADOW.brutalSm,
+  },
+  subEyebrow: { fontSize: 10, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1.5 },
+  subTitle: { marginTop: 4, fontSize: 18, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -0.5 },
+  subSub: { marginTop: 2, fontSize: 12, fontWeight: FONT.bold, color: COLORS.text, opacity: 0.85 },
 
   section: { marginTop: 28, marginBottom: 10, fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text },
   lockedHint: { marginBottom: 10, fontSize: 10, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 1 },

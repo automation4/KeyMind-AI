@@ -1,0 +1,35 @@
+{
+  "summary": "Backend verification of the new MOCK-payment Premium subscription flow — ALL 12 PYTEST CHECKS PASS against the public preview URL. (1) GET /api/subscription/plans returns weekly (₹250/7d) and monthly (₹800/30d), currency=INR, no auth required. (2) Fresh guest → POST /subscribe {plan:'weekly'} returns mock_payment=true, sets is_premium=true, subscription_plan='weekly', subscription_expires_at ≈ now+7d (±120s); /auth/me reflects premium_source='subscription' and tool_uses_remaining=null; 12 consecutive /api/ai/tool calls all 200 (no 429). (3) Monthly subscribe → expiry ≈ now+30d, premium_source='subscription'. (4) Stacking: subscribe weekly twice on the same user → 2nd response expiry ≈ now+14d (extends from current expiry, not replaces). (5) Cancel: returns user.is_premium=false, subscription_plan=null, subscription_expires_at=null, premium_source=null, tool_uses_limit=10, tool_uses_remaining=10. (6) Admin precedence: admin /subscribe/cancel keeps is_premium=true and premium_source='admin'. (7) Whitelisted guest subscribes — premium_source remains 'admin' (admin takes precedence in projection per server.py:206-209). (8) Admin DELETE /api/admin/whitelist/<email> on a whitelisted+subscribed user: is_premium stays true, subscription_plan='monthly', premium_source flips to 'subscription' (admin grant cleared, paid sub keeps user premium). (9) Invalid plan 'yearly' → 400. (10) /subscribe and /cancel without bearer → 401. (11) Regression: non-premium 11th /api/ai/tool call → 429 with detail containing 'Daily limit' and '10/day'. Backend code review: _subscription_active correctly checked in admin_remove_whitelist (server.py:493); SUBSCRIPTION_PLANS const correct (server.py:136-139); _user_public premium_source priority is admin > subscription (server.py:206-209) — matches review request expectation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_subscription.py",
+    "/app/test_reports/pytest/iter4_subscription.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "subscribe() correctly stacks expiry: base = max(now, current_exp) + timedelta(days=info['days']) (server.py:522-525). Verified: 2 sequential weekly subscribes → ~14d expiry.",
+    "cancel() clears subscription_plan + expires_at then re-runs _ensure_whitelist_sync, which correctly re-derives is_premium from is_admin OR admin_granted OR sub_active (server.py:179-180). Admin/whitelisted users keep premium — verified.",
+    "admin_remove_whitelist (server.py:486-495) correctly checks _subscription_active before clearing is_premium, preserving paid users — verified.",
+    "premium_source projection: 'admin' if is_admin OR _admin_granted, else 'subscription' if _subscription_active, else None (server.py:206-209). Admin precedence on whitelisted+subscribed user verified.",
+    "mock_payment=true flag returned by /subscribe (server.py:540) — confirmed in TestSubscribeWeekly.",
+    "EXPO_BACKEND_URL env key is actually EXPO_PUBLIC_BACKEND_URL in /app/frontend/.env. Test resolves either, but flagging in case frontend code or other tests assume the unprefixed name."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_subscription.py (new — 12 pytest test cases covering all subscription scenarios from review request)"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Tests create ~6 throwaway guest users via /api/auth/guest and 2 temporary whitelist entries (both deleted in-test). No production data touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Subscription flow is fully passing. Reusable suite: pytest /app/backend/tests/test_subscription.py -v. Note: stacking tolerance is 180s (covers HTTP round-trip latency for 2 sequential POSTs). Expiry tolerance for single-plan tests is 120s. Frontend (pricing.tsx) NOT tested per request scope — main agent should self-verify the UI calls /api/subscription/plans + /subscribe and handles the {mock_payment:true} response.",
+  "rca_of_issue": "No production bug found. All 12 subscription test scenarios from the review request pass on the first run."
+}

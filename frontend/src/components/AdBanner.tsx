@@ -1,23 +1,27 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
 
 import { COLORS, FONT, RADIUS, SHADOW } from "@/src/lib/theme";
 import { useAuth } from "@/src/contexts/AuthContext";
 
 /**
  * Mock ad banner shown to all non-premium users.
- * "Premium" here means admin-whitelisted ad-free users (not a paid public tier).
- * Placeholder copy only — no real ad SDK is integrated yet.
+ * "Premium" includes admin-whitelisted users and active paid subscribers.
+ * Tapping the banner takes the user to /pricing.
  */
 export function AdBanner({ placement = "top" }: { placement?: "top" | "bottom" }) {
   const { user } = useAuth();
+  const router = useRouter();
 
-  // Hide for ad-free (admin + whitelisted) users.
+  // Hide for premium (admin / whitelisted / subscribed) users.
   if (!user) return null;
   if (user.is_premium || user.is_admin) return null;
 
   return (
-    <View
+    <TouchableOpacity
+      onPress={() => router.push("/pricing")}
+      activeOpacity={0.85}
       style={[styles.banner, placement === "bottom" && styles.bottom]}
       testID="ad-banner"
     >
@@ -26,13 +30,13 @@ export function AdBanner({ placement = "top" }: { placement?: "top" | "bottom" }
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.title} numberOfLines={1}>
-          Sponsored · Your ad could be here ✨
+          Remove ads · Unlimited from ₹250/wk
         </Text>
         <Text style={styles.sub} numberOfLines={1}>
-          Mock placement · Real ads coming soon
+          Tap to see Premium plans →
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

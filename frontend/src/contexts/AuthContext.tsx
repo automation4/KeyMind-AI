@@ -9,6 +9,9 @@ export type User = {
   is_guest?: boolean;
   is_admin?: boolean;
   is_premium?: boolean;
+  premium_source?: "admin" | "subscription" | null;
+  subscription_plan?: "weekly" | "monthly" | null;
+  subscription_expires_at?: string | null;
   tool_uses_today?: number;
   tool_uses_limit?: number;
   tool_uses_remaining?: number | null;
