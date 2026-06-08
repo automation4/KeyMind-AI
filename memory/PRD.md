@@ -17,6 +17,22 @@ A true Android system keyboard (IME) would require native Kotlin (`InputMethodSe
 - **Guest mode** (one-tap, no account)
 - Session persistence (token stored via `@/src/utils/storage`)
 - `POST /api/auth/session`, `POST /api/auth/guest`, `GET /api/auth/me`, `POST /api/auth/logout`
+- **Admin Auth (hidden email/password)** — `POST /api/auth/admin`
+  - Login screen: "Sign in with email" link → email input → password field appears ONLY when email matches admin email (`himthegreat@gmail.com`)
+  - Single admin account; password `auto` (configurable via env `ADMIN_EMAIL`, `ADMIN_PASSWORD`)
+
+### F2b Admin Panel & Subscription Tiers (NEW)
+- Admin Settings panel (`/app/(tabs)/settings.tsx`, visible only when `user.is_admin`)
+  - Whitelist management — add email → grants premium; toggle Switch → premium ON/OFF; trash icon → revoke access
+  - Lists only whitelisted users (`GET/POST/PUT/DELETE /api/admin/whitelist`)
+- **Free tier limits** (enforced server + frontend):
+  - 5 AI tool uses per day (combined across all tools) — resets daily; tracked on `user.tool_usage_date` + `user.tool_usage_count`. 6th call → HTTP 429 → frontend opens UpgradePrompt modal
+  - 3 language selections in setup (UpgradePrompt on 4th)
+  - 2 accent colors unlocked (orange + butter); 4 others show lock icons
+- **Ad placeholders** (`/src/components/AdBanner.tsx`) — top of Write, History, Chat for non-premium; tap → `/pricing`
+- **UpgradePrompt** modal (`/src/components/UpgradePrompt.tsx`) — shown on hitting any free-tier limit
+
+
 
 ### F3 First-Time Setup
 - Multi-select language preferences (14 Indian languages)
