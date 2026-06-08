@@ -192,12 +192,12 @@ const styles = StyleSheet.create({
   },
   quickText: { fontSize: 14, fontWeight: FONT.bold, color: COLORS.text },
   bubble: {
-    padding: 14, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border,
+    paddingHorizontal: 16, paddingVertical: 12, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border,
     marginBottom: 10, maxWidth: "92%",
   },
   userBubble: { alignSelf: "flex-end", backgroundColor: COLORS.secondary },
   aiBubble: { alignSelf: "flex-start", backgroundColor: COLORS.surface, ...SHADOW.brutalSm },
-  bubbleText: { fontSize: 14, lineHeight: 20, color: COLORS.text, fontWeight: FONT.regular },
+  bubbleText: { fontSize: 14, lineHeight: 22, color: COLORS.text, fontWeight: FONT.regular },
   composer: {
     flexDirection: "row", alignItems: "flex-end", gap: 8,
     padding: 12, paddingBottom: 12, paddingTop: 8,
@@ -205,9 +205,9 @@ const styles = StyleSheet.create({
   },
   composerInput: {
     flex: 1, minHeight: 44, maxHeight: 120,
-    paddingHorizontal: 14, paddingVertical: 10,
+    paddingHorizontal: 16, paddingVertical: 12,
     borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border,
-    backgroundColor: COLORS.surface, fontSize: 15, color: COLORS.text,
+    backgroundColor: COLORS.surface, fontSize: 15, lineHeight: 22, color: COLORS.text,
   },
   sendBtn: {
     width: 44, height: 44, borderRadius: RADIUS.lg,

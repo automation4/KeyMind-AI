@@ -602,9 +602,18 @@ const styles = StyleSheet.create({
 
   inputCard: {
     backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border,
-    borderRadius: RADIUS.lg, padding: 16, ...SHADOW.brutal,
+    borderRadius: RADIUS.lg, paddingHorizontal: 20, paddingVertical: 18, ...SHADOW.brutal,
   },
-  input: { minHeight: 140, fontSize: 16, lineHeight: 22, color: COLORS.text, fontWeight: FONT.regular, textAlignVertical: "top" },
+  input: {
+    minHeight: 140,
+    fontSize: 16,
+    lineHeight: 24,
+    color: COLORS.text,
+    fontWeight: FONT.regular,
+    textAlignVertical: "top",
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
   inputFooter: { marginTop: 12, gap: 10 },
   actionRow: { flexDirection: "row", gap: 8 },
   smallBtn: {
@@ -659,9 +668,9 @@ const styles = StyleSheet.create({
 
   resultCard: {
     backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border,
-    borderRadius: RADIUS.lg, padding: 16, marginBottom: 10, ...SHADOW.brutal,
+    borderRadius: RADIUS.lg, paddingHorizontal: 20, paddingVertical: 18, marginBottom: 10, ...SHADOW.brutal,
   },
-  resultText: { fontSize: 15, lineHeight: 22, color: COLORS.text },
+  resultText: { fontSize: 15, lineHeight: 24, color: COLORS.text, paddingHorizontal: 2 },
   resultActions: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" },
   applyBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
