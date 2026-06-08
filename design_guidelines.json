@@ -1,0 +1,116 @@
+{
+  "project_identity": {
+    "domain": "Productivity / AI Writing Companion (Mobile Web App)",
+    "theme": "LIGHT (Primary) with Dark Mode support",
+    "archetype": "Archetype 3 (Pastel & Soft) with Neo-Brutalist Twist",
+    "vibe": "Approachable, tactile, optimistic, and highly distinct. Breaking the sterile 'SaaS' look of typical AI tools by using Neo-Brutalist hard borders paired with soft pastels."
+  },
+  "color_system": {
+    "strategy": "Soft Pastels + Hard Contrast. Deep charcoal text over butter yellow, pale mint, or peach backgrounds.",
+    "palette": {
+      "background_light": "#FFFDF9",
+      "background_dark": "#121212",
+      "surface_light": "#FFFFFF",
+      "surface_dark": "#1C1C1C",
+      "text_primary_light": "#0F0F0F",
+      "text_secondary_light": "#525252",
+      "text_primary_dark": "#F5F5F5",
+      "text_secondary_dark": "#A3A3A3",
+      "accent_primary": "#FF9F1C",
+      "accent_secondary": "#FFD166",
+      "accent_mint": "#A7F3D0",
+      "accent_peach": "#FFDAB9",
+      "diff_addition_bg": "#A7F3D0",
+      "diff_addition_text": "#0F0F0F",
+      "diff_deletion_bg": "#FECDD3",
+      "diff_deletion_text": "#0F0F0F",
+      "border_hard": "#0F0F0F",
+      "border_hard_dark": "#333333"
+    },
+    "rules": [
+      "Avoid standard soft shadows. Use hard offset shadows: shadow-[4px_4px_0px_0px_rgba(15,15,15,1)].",
+      "Never use Teal or Purple for CTAs.",
+      "In light mode, borders on interactive elements should be 2px solid #0F0F0F."
+    ]
+  },
+  "typography": {
+    "font_strategy": "The 'Swiss Brutalist' strategy. High weight contrast. Massive black headings with clean readable body.",
+    "fonts": {
+      "headings": "Cabinet Grotesk, sans-serif",
+      "body": "Satoshi, sans-serif",
+      "import_instructions": "Import via CSS: @import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,900&f[]=satoshi@400,500,700&display=swap');"
+    },
+    "scale_rules": {
+      "h1_hero": "text-4xl sm:text-5xl font-black tracking-tighter leading-none text-text_primary_light",
+      "h2_section": "text-2xl sm:text-3xl font-black tracking-tight",
+      "h3_card": "text-xl font-bold",
+      "body": "text-base font-medium leading-relaxed",
+      "small_label": "text-xs font-bold uppercase tracking-[0.15em]"
+    }
+  },
+  "spacing_and_layout": {
+    "strategy": "Mobile-First Neo-Brutalism. Clear grid boundaries, generous inner padding.",
+    "rules": [
+      "Mobile screen containers MUST have horizontal padding of p-6.",
+      "Card internal padding must be minimum p-6 to avoid text colliding with the hard 2px borders.",
+      "Horizontal scroll lists (16 AI Tools) must have massive gaps (gap-4) and horizontal scroll snapping."
+    ]
+  },
+  "surface_strategies": {
+    "bottom_sheets": "Solid #FFFFFF background, rounded-t-3xl, top border is 2px solid #0F0F0F. Drag handle is a solid black pill.",
+    "suggestion_cards": "Solid #FFFFFF with 2px border-black and shadow-[4px_4px_0px_0px_rgba(15,15,15,1)]. Diff views use strong mint/rose background spans.",
+    "tts_buttons": "Rounded-full, bg-accent_secondary, border-2 border-black, shadow-[2px_2px_0px_0px_rgba(15,15,15,1)].",
+    "ai_tools_toolbar": "Flat background for the container. Chips: rounded-xl, border-2 border-black, bg-surface_light, hover:shadow-[2px_2px_0px_0px_rgba(15,15,15,1)] hover:-translate-y-0.5 transition-all."
+  },
+  "components": {
+    "onboarding": "Full viewport height. Swipeable slides. Large expressive typography. Backgrounds use the provided image URLs.",
+    "auth_and_setup": "Cards with hard borders. Language/Theme selectors use Shadcn Select but customized with bold text and 2px borders.",
+    "ai_writing_tools": "Horizontal flex list. 16 tools represented as bold, tactile chips.",
+    "grammar_diff_view": "Grammarly style inline cards but Neo-Brutalist. Apply (solid black bg, white text), Dismiss (white bg, black border).",
+    "chatbot_panel": "Control Room grid structure. Bubbles have border-2 border-black. User bubble bg-accent_secondary, AI bubble bg-white.",
+    "pricing_screen": "Cards with massive typography. 'Premium' plan card uses bg-accent_primary, border-4 border-black, and a glowing Tracing Beam or harsh offset shadow."
+  },
+  "motion_and_interactions": {
+    "rules": [
+      "Active/Press state: shadow-[0px_0px_0px_0px_rgba(15,15,15,1)] translate-x-[2px] translate-y-[2px] (physical button press effect).",
+      "Include 'data-testid' on all interactive elements.",
+      "AI text generation should look like a terminal typewriter."
+    ]
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Stroke width 2.5 or 3.0 to match the bold Neo-Brutalist borders."
+  },
+  "image_urls": {
+    "onboarding_bg_1": {
+      "url": "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwyfHxhYnN0cmFjdCUyMHZpYnJhbnQlMjBncmFkaWVudCUyMHRleHR1cmV8ZW58MHx8fHwxNzgwOTI1NzE2fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Vibrant gradient texture",
+      "usage": "Hero slide background for onboarding."
+    },
+    "onboarding_bg_2": {
+      "url": "https://images.unsplash.com/photo-1604076913837-52ab5629fba9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMHZpYnJhbnQlMjBncmFkaWVudCUyMHRleHR1cmV8ZW58MHx8fHwxNzgwOTI1NzE2fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Purple/Orange vibrant gradient",
+      "usage": "AI features slide background in onboarding."
+    },
+    "pricing_hero": {
+      "url": "https://images.pexels.com/photos/36957437/pexels-photo-36957437.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Vibrant abstract swirl",
+      "usage": "Use in the pricing screen for the premium plan illustration."
+    },
+    "user_typing": {
+      "url": "https://images.unsplash.com/photo-1758876203551-80e8aa290d28?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwyfHxwZXJzb24lMjB0eXBpbmclMjBvbiUyMG1vYmlsZSUyMGhhcHB5fGVufDB8fHx8MTc4MDkyNTcxNXww&ixlib=rb-4.1.0&q=85",
+      "description": "Happy user typing on mobile",
+      "usage": "Onboarding slide demonstrating the mobile writing experience."
+    }
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: Use React + Tailwind CSS + Shadcn UI components. Ensure all components are written in .js (JSX), NOT .tsx.",
+    "CRITICAL: The environment is 'mobile_web_app'. Build responsive web but wrap the main app layout in a mobile constraint (max-w-md mx-auto min-h-screen relative shadow-2xl border-x-2 border-black bg-background_light) so it looks like a mobile app on desktop.",
+    "CRITICAL: Apply the Neo-Brutalist twist: heavy use of border-2 border-black, bold offset shadows (shadow-[4px_4px_0px_0px_#0F0F0F]), and high-contrast typography.",
+    "CRITICAL: Import Cabinet Grotesk and Satoshi fonts via Fontshare CDN in the global CSS. Do NOT use Inter.",
+    "CRITICAL: Add 'data-testid' to ALL interactive elements (buttons, inputs, tabs, chips).",
+    "CRITICAL: The 16 AI Tools must be implemented as a horizontally scrollable container with draggable chips.",
+    "CRITICAL: For grammar diffs, highlight removed text with bg-diff_deletion_bg + line-through, and added text with bg-diff_addition_bg. Do NOT use generic red/green without contrast checking.",
+    "CRITICAL: Only use the images provided in the image_urls block. No placeholders allowed."
+  ]
+}
