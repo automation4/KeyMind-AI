@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { TOOLS, TOOL_BY_ID } from "@/src/lib/tools";
@@ -49,6 +50,7 @@ export default function WriteScreen() {
   const [appliedToast, setAppliedToast] = useState(false);
   const [pendingOptions, setPendingOptions] = useState<Record<string, string>>({});
   const [toolPickerOpen, setToolPickerOpen] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
 
   const wordCount = useMemo(
     () => (text.trim() ? text.trim().split(/\s+/).length : 0),
@@ -108,6 +110,57 @@ export default function WriteScreen() {
     setTimeout(() => setAppliedToast(false), 1200);
   };
 
+  const handleUpload = async () => {
+    setError(null);
+    try {
+      // Permission (no-op on web)
+      if (Platform.OS !== "web") {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          setError("Photo library permission needed to upload an image.");
+          return;
+        }
+      }
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        base64: true,
+      });
+      if (picked.canceled || !picked.assets?.length) return;
+      const asset = picked.assets[0];
+      let b64 = asset.base64;
+      if (!b64 && asset.uri) {
+        // Fallback fetch as data URL
+        const resp = await fetch(asset.uri);
+        const blob = await resp.blob();
+        b64 = await new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onloadend = () => resolve(String(r.result).split(",")[1] || "");
+          r.readAsDataURL(blob);
+        });
+      }
+      if (!b64) {
+        setError("Could not read the selected image.");
+        return;
+      }
+      setOcrBusy(true);
+      const res = await api.ocr(b64);
+      if (!res.text) {
+        setError("No readable text found in the image.");
+        return;
+      }
+      setText((prev) => (prev ? prev.trimEnd() + "\n" + res.text : res.text));
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e: any) {
+      setError(e?.message || "Image extraction failed");
+    } finally {
+      setOcrBusy(false);
+    }
+  };
+
   const dismiss = () => setResult(null);
 
   const retry = () => {
@@ -150,7 +203,20 @@ export default function WriteScreen() {
           />
           <View style={styles.inputFooter}>
             <Text style={styles.meta}>{wordCount} WORDS</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+              <TouchableOpacity
+                onPress={handleUpload}
+                disabled={ocrBusy}
+                style={[styles.smallBtn, { backgroundColor: COLORS.mint }]}
+                testID="upload-image-btn"
+              >
+                {ocrBusy ? (
+                  <ActivityIndicator size="small" color={COLORS.text} />
+                ) : (
+                  <Ionicons name="image-outline" size={14} color={COLORS.text} />
+                )}
+                <Text style={styles.smallBtnText}>{ocrBusy ? "READING…" : "UPLOAD"}</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => copy(text)}
                 disabled={!text}

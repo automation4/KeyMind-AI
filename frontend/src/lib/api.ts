@@ -55,6 +55,15 @@ export const api = {
       { method: "POST", body: { tool, text, options } },
     ),
 
+  ocr: (image_base64: string) =>
+    request<{ text: string }>("/ocr", { method: "POST", body: { image_base64 } }),
+
+  tts: (text: string, voice?: string) =>
+    request<{ audio_base64: string; voice: string; mime: string }>("/tts", {
+      method: "POST",
+      body: { text, voice },
+    }),
+
   chat: (session_id: string, message: string) =>
     request<{ session_id: string; reply: string }>("/ai/chat", {
       method: "POST",

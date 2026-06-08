@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from emergentintegrations.llm.openai.text_to_speech import OpenAITextToSpeech
+import base64
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -85,6 +87,19 @@ class HistoryCreate(BaseModel):
     tool: str
     original: str
     applied: str
+
+
+class OCRRequest(BaseModel):
+    image_base64: str  # raw base64 (no data: prefix)
+
+
+class OCRResponse(BaseModel):
+    text: str
+
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: Optional[str] = None  # optional override
 
 
 # =====================================================
@@ -422,6 +437,125 @@ async def delete_history(item_id: str, authorization: Optional[str] = Header(Non
     user = await get_current_user(authorization)
     res = await db.history.delete_one({"id": item_id, "user_id": user["user_id"]})
     return {"deleted": res.deleted_count}
+
+
+# =====================================================
+# OCR — Image → Text (any language)
+# =====================================================
+@api.post("/ocr", response_model=OCRResponse)
+async def ocr(req: OCRRequest):
+    if not req.image_base64:
+        raise HTTPException(status_code=400, detail="image_base64 required")
+    # Strip data URI prefix if present
+    b64 = req.image_base64
+    if "," in b64:
+        b64 = b64.split(",", 1)[1]
+    # Quick sanity check
+    try:
+        base64.b64decode(b64, validate=False)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 image data")
+
+    session_id = f"ocr-{uuid.uuid4().hex[:8]}"
+    system = (
+        "You are an OCR engine. Extract ALL readable text from the image EXACTLY as written. "
+        "Preserve original language, script (Devanagari, Tamil, Bengali, Arabic, Chinese, etc.), "
+        "and line breaks. Do NOT translate, summarize, explain, or add formatting. "
+        "If the image contains no readable text, reply with the single token: NO_TEXT_FOUND"
+    )
+    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system).with_model(
+        "gemini", "gemini-3-flash-preview"
+    )
+    try:
+        msg = UserMessage(
+            text="Extract all visible text from this image.",
+            file_contents=[ImageContent(image_base64=b64)],
+        )
+        reply = await chat.send_message(msg)
+        text = str(reply).strip()
+    except Exception as e:
+        logger.exception("OCR failed")
+        raise HTTPException(status_code=502, detail=f"OCR error: {e}")
+
+    if text.upper().startswith("NO_TEXT_FOUND"):
+        text = ""
+    return OCRResponse(text=text)
+
+
+# =====================================================
+# TTS — Native-voice audio via OpenAI tts-1
+# =====================================================
+# Detect script → choose the most natural-sounding OpenAI voice for that language family.
+# OpenAI tts-1 voices are multilingual; we map by script so Hindi gets a warm voice and
+# English gets a crisp one.
+def _detect_voice(text: str) -> str:
+    if not text:
+        return "nova"
+    for ch in text:
+        code = ord(ch)
+        # Devanagari (Hindi, Marathi, Sanskrit)
+        if 0x0900 <= code <= 0x097F:
+            return "shimmer"
+        # Bengali / Assamese
+        if 0x0980 <= code <= 0x09FF:
+            return "shimmer"
+        # Tamil
+        if 0x0B80 <= code <= 0x0BFF:
+            return "nova"
+        # Telugu
+        if 0x0C00 <= code <= 0x0C7F:
+            return "nova"
+        # Kannada
+        if 0x0C80 <= code <= 0x0CFF:
+            return "nova"
+        # Malayalam
+        if 0x0D00 <= code <= 0x0D7F:
+            return "nova"
+        # Gujarati
+        if 0x0A80 <= code <= 0x0AFF:
+            return "shimmer"
+        # Punjabi (Gurmukhi)
+        if 0x0A00 <= code <= 0x0A7F:
+            return "shimmer"
+        # Odia
+        if 0x0B00 <= code <= 0x0B7F:
+            return "nova"
+        # Arabic / Urdu
+        if 0x0600 <= code <= 0x06FF:
+            return "fable"
+        # CJK Unified Ideographs
+        if 0x4E00 <= code <= 0x9FFF:
+            return "alloy"
+        # Hiragana / Katakana
+        if 0x3040 <= code <= 0x30FF:
+            return "alloy"
+    return "nova"
+
+
+@api.post("/tts")
+async def tts(req: TTSRequest):
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="text required")
+
+    voice = req.voice or _detect_voice(req.text)
+    if voice not in OpenAITextToSpeech.VOICES:
+        voice = "nova"
+
+    try:
+        tts_client = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
+        audio_bytes = await tts_client.generate_speech(
+            text=req.text[:4000],
+            model="tts-1",
+            voice=voice,
+            speed=1.0,
+            response_format="mp3",
+        )
+    except Exception as e:
+        logger.exception("TTS failed")
+        raise HTTPException(status_code=502, detail=f"TTS error: {e}")
+
+    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+    return {"audio_base64": audio_b64, "voice": voice, "mime": "audio/mpeg"}
 
 
 # =====================================================
