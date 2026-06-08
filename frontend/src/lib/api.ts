@@ -22,9 +22,10 @@ async function request<T = any>(
 ): Promise<T> {
   const { method = "GET", body, auth = false } = options;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (auth) {
-    const token = await getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+  // Always send auth if a token exists — backend uses it to track per-user usage limits.
+  const token = await getToken();
+  if ((auth || token) && token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
   const res = await fetch(`${BASE}/api${path}`, {
     method,
@@ -33,7 +34,15 @@ async function request<T = any>(
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(err || `Request failed: ${res.status}`);
+    const e: any = new Error(err || `Request failed: ${res.status}`);
+    e.status = res.status;
+    try {
+      const parsed = JSON.parse(err);
+      e.detail = parsed?.detail || err;
+    } catch {
+      e.detail = err;
+    }
+    throw e;
   }
   return (await res.json()) as T;
 }
@@ -46,13 +55,18 @@ export const api = {
     }),
   guest: () =>
     request<{ session_token: string; user: any }>("/auth/guest", { method: "POST" }),
+  adminLogin: (email: string, password: string) =>
+    request<{ session_token: string; user: any }>("/auth/admin", {
+      method: "POST",
+      body: { email, password },
+    }),
   me: () => request<{ user: any }>("/auth/me", { auth: true }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST", auth: true }),
 
   tool: (tool: string, text: string, options: Record<string, any> = {}) =>
     request<{ tool: string; original: string; suggestions: string[]; explanation?: string }>(
       "/ai/tool",
-      { method: "POST", body: { tool, text, options } },
+      { method: "POST", body: { tool, text, options }, auth: true },
     ),
 
   ocr: (image_base64: string) =>
@@ -68,6 +82,7 @@ export const api = {
     request<{ session_id: string; reply: string }>("/ai/chat", {
       method: "POST",
       body: { session_id, message },
+      auth: true,
     }),
   chatHistory: (session_id: string) =>
     request<{ session_id: string; messages: Array<{ role: string; content: string }> }>(
@@ -78,4 +93,28 @@ export const api = {
     request("/history", { method: "POST", body: { tool, original, applied }, auth: true }),
   getHistory: () => request<{ items: any[] }>("/history", { auth: true }),
   deleteHistory: (id: string) => request(`/history/${id}`, { method: "DELETE", auth: true }),
+
+  // Admin
+  adminList: () =>
+    request<{ items: Array<{ email: string; is_premium: boolean; added_at?: string; name?: string | null; has_account: boolean; tool_uses_today: number }> }>(
+      "/admin/whitelist",
+      { auth: true },
+    ),
+  adminAdd: (email: string, is_premium = true) =>
+    request<{ ok: boolean; email: string; is_premium: boolean }>("/admin/whitelist", {
+      method: "POST",
+      body: { email, is_premium },
+      auth: true,
+    }),
+  adminToggle: (email: string, is_premium: boolean) =>
+    request<{ ok: boolean; email: string; is_premium: boolean }>("/admin/whitelist", {
+      method: "PUT",
+      body: { email, is_premium },
+      auth: true,
+    }),
+  adminRemove: (email: string) =>
+    request<{ deleted: number }>(`/admin/whitelist/${encodeURIComponent(email)}`, {
+      method: "DELETE",
+      auth: true,
+    }),
 };

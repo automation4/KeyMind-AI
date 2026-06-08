@@ -22,6 +22,8 @@ import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useTheme } from "@/src/contexts/ThemeContext";
 import { DiffView } from "@/src/components/DiffView";
+import { AdBanner } from "@/src/components/AdBanner";
+import { UpgradePrompt } from "@/src/components/UpgradePrompt";
 
 const accentBg: Record<string, string> = {
   orange: COLORS.primary,
@@ -39,7 +41,7 @@ type Result = {
 };
 
 export default function WriteScreen() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { accentColor } = useTheme();
   const [text, setText] = useState("");
   const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -51,6 +53,14 @@ export default function WriteScreen() {
   const [pendingOptions, setPendingOptions] = useState<Record<string, string>>({});
   const [toolPickerOpen, setToolPickerOpen] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeMessage, setUpgradeMessage] = useState<string | undefined>();
+
+  const isPremium = !!(user?.is_premium || user?.is_admin);
+  const usesToday = user?.tool_uses_today ?? 0;
+  const usesLimit = user?.tool_uses_limit ?? 5;
+  const usesLeft = isPremium ? Infinity : Math.max(0, usesLimit - usesToday);
+  const limitReached = !isPremium && usesLeft <= 0;
 
   const wordCount = useMemo(
     () => (text.trim() ? text.trim().split(/\s+/).length : 0),
@@ -60,6 +70,13 @@ export default function WriteScreen() {
   const runTool = async (toolId: string, options: Record<string, any> = {}) => {
     if (!text.trim()) {
       setError("Type something first ✍️");
+      return;
+    }
+    if (limitReached) {
+      setUpgradeMessage(
+        `You've hit today's free limit of ${usesLimit} AI uses. Upgrade for unlimited writing.`,
+      );
+      setUpgradeOpen(true);
       return;
     }
     setLoading(true);
@@ -72,8 +89,19 @@ export default function WriteScreen() {
     try {
       const data = await api.tool(toolId, text, options);
       setResult({ tool: toolId, original: text, suggestions: data.suggestions });
+      // Refresh usage counter from server
+      refreshUser();
     } catch (e: any) {
-      setError(e?.message || "Something went wrong");
+      if (e?.status === 429) {
+        setUpgradeMessage(
+          e?.detail ||
+            `Daily free limit reached (${usesLimit}/day). Upgrade for unlimited AI tool uses.`,
+        );
+        setUpgradeOpen(true);
+        refreshUser();
+      } else {
+        setError(e?.detail || e?.message || "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
@@ -187,6 +215,20 @@ export default function WriteScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Ad banner (free-tier only) */}
+        <AdBanner placement="top" />
+
+        {/* Free-tier usage chip */}
+        {!isPremium && (
+          <View style={styles.usageChip} testID="write-usage-chip">
+            <Ionicons name="flash-outline" size={14} color={COLORS.text} />
+            <Text style={styles.usageChipText}>
+              {usesToday}/{usesLimit} AI uses today
+            </Text>
+            <Text style={styles.usageChipSub}>· Resets daily</Text>
+          </View>
+        )}
+
         {/* Text input card */}
         <View style={styles.inputCard}>
           <TextInput
@@ -451,6 +493,13 @@ export default function WriteScreen() {
           <Text style={styles.toastText}>Done</Text>
         </View>
       )}
+
+      <UpgradePrompt
+        visible={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        title="Daily limit reached"
+        message={upgradeMessage}
+      />
     </SafeAreaView>
   );
 }
@@ -567,4 +616,15 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
   },
   toastText: { color: COLORS.bg, fontWeight: FONT.black, fontSize: 13, letterSpacing: 1 },
+  usageChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    borderWidth: 2, borderColor: COLORS.border,
+    backgroundColor: COLORS.peach,
+    marginBottom: 10,
+  },
+  usageChipText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.5 },
+  usageChipSub: { fontSize: 10, fontWeight: FONT.bold, color: COLORS.text, opacity: 0.6 },
 });

@@ -1,0 +1,52 @@
+{
+  "summary": "Tested newly added Admin Auth + Free-tier limits + Ad placeholder features. Backend: 12 pytest tests in test_admin_and_limits.py — ALL 12 PASS (admin login valid/invalid, /auth/me admin flags, free-tier 5 calls then 429, admin unlimited, whitelist Add/List/Toggle/Delete + 401 auth checks + 400 self-whitelist + 404 toggle-nonexistent). Frontend: admin login UI (show-email-login → email input → password hidden for non-admin with generic error → password shown for admin → SIGN IN redirects to /setup), admin Settings panel (ADMIN pill, admin-panel section, add/toggle/remove whitelist row all working), admin accents do NOT show lock icons. Guest flow: ad-banner visible on Write/History/Chat tabs, write-usage-chip shows '0/5 AI uses today', Settings shows usage-card '0/5' + FREE pill, 4 accent colors locked, UpgradePrompt modal appears on selecting a 4th language in Setup screen. Auth bug from iteration_1 (guest setup-bypass) is FIXED (login.tsx useEffect now gates with busy flag). All integrations live (Gemini/OpenAI TTS/OCR). Cosmetic: deprecated shadow* and pointerEvents warnings persist.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Settings tab",
+        "issues": ["Settings eyebrow still reads 'YOU' (minor naming inconsistency, unchanged from iter1)."]
+      }
+    ],
+    "react_native_issues": [
+      {
+        "component": "theme/global styles",
+        "issue": "Deprecated 'shadow*' style props emit console warnings on web. Migrate to `boxShadow`. Reference: /app/frontend/src/lib/theme.ts (SHADOW.brutal / brutalSm)"
+      },
+      {
+        "component": "pointerEvents prop",
+        "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Likely in a Modal/View; move into style."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_and_limits.py",
+    "/app/backend/tests/test_keymind_backend.py",
+    "/app/test_reports/pytest/iter2_admin_limits.xml"
+  ],
+  "action_items": [
+    "(LOW) Replace deprecated `shadow*` style props with `boxShadow` in /app/frontend/src/lib/theme.ts",
+    "(LOW) Replace deprecated `pointerEvents` prop with style.pointerEvents wherever used",
+    "(OPTIONAL) Rename Settings eyebrow 'YOU' → 'SETTINGS' for naming consistency"
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~790 lines; consider splitting into routers (auth/ai/admin/history) for maintainability.",
+    "Admin password compared via hmac.compare_digest — good (timing-safe). Default password is hardcoded in env defaults; encourage rotating ADMIN_PASSWORD in production.",
+    "Free-tier counter is per-user (db.users.tool_usage_count/date) and resets when date != today — correct logic. Note: counter NOT incremented for unauthenticated /api/ai/tool calls (when no Authorization header) — these slip through unmetered. Consider requiring auth on /api/ai/tool, since the frontend always sends a token after login/guest sign-in.",
+    "/api/ai/chat also gated by _enforce_and_count_usage — confirmed.",
+    "Whitelist endpoints correctly require admin and sync user.is_premium on add/toggle/delete.",
+    "All Mongo queries exclude _id via projection."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin_and_limits.py (new)"],
+  "success_rate": {"backend": "100% (12/12 new + 16/16 regression in iter1 suite)", "frontend": "100% on new features"},
+  "seed_data_creation": "Whitelist entries created with random TEST_ emails are deleted within the same test class teardown. Admin user persists in db.users (single admin record reused).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend admin/limit tests in /app/backend/tests/test_admin_and_limits.py — reusable as regression. Frontend Free-tier limit cannot be UI-tested deterministically because the limit is shared across guest sessions on the same backend (must create fresh guest); used backend test to verify 429 logic. Guest setup-bypass bug from iter1 confirmed fixed (router uses busy guard). To navigate from / to (tabs)/Write tab in a test, set BOTH `keymind_onboarded` AND `keymind_setup_done` in localStorage before navigation; otherwise root redirects to /onboarding or /setup.",
+  "rca_of_issue": "No new bugs found in this iteration. All new endpoints + UI testIDs (admin-panel, wl-row-*, wl-toggle-*, ad-banner, write-usage-chip, usage-card, login-email-input, login-password-input, show-email-login) wired correctly and verified end-to-end."
+}

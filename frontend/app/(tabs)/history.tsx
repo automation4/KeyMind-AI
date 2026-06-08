@@ -8,6 +8,7 @@ import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
 import { TOOL_BY_ID } from "@/src/lib/tools";
 import { ListenButton } from "@/src/components/ListenButton";
+import { AdBanner } from "@/src/components/AdBanner";
 
 type Item = {
   id: string;
@@ -61,6 +62,7 @@ export default function HistoryScreen() {
           contentContainerStyle={{ padding: 20, paddingBottom: 24 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
         >
+          <AdBanner placement="top" />
           {items.length === 0 ? (
             <View style={styles.empty} testID="history-empty">
               <Ionicons name="time-outline" size={48} color={COLORS.textMuted} />

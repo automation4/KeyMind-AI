@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
 import { ListenButton } from "@/src/components/ListenButton";
+import { AdBanner } from "@/src/components/AdBanner";
 import { storage } from "@/src/utils/storage";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -87,6 +88,10 @@ export default function ChatScreen() {
         <TouchableOpacity style={styles.resetBtn} onPress={reset} testID="chat-reset-btn">
           <Ionicons name="refresh" size={18} color={COLORS.text} />
         </TouchableOpacity>
+      </View>
+
+      <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+        <AdBanner placement="top" />
       </View>
 
       <KeyboardAvoidingView

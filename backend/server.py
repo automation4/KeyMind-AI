@@ -5,11 +5,12 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import uuid
+import hmac
 import httpx
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 from emergentintegrations.llm.openai.text_to_speech import OpenAITextToSpeech
@@ -22,6 +23,13 @@ load_dotenv(ROOT_DIR / ".env")
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
+
+# Admin credentials (single-admin app)
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "himthegreat@gmail.com").lower().strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "auto")
+
+# Free-tier daily AI usage limit (any tool, any combination)
+FREE_TOOL_DAILY_LIMIT = int(os.environ.get("FREE_TOOL_DAILY_LIMIT", "5"))
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -40,6 +48,11 @@ class SessionCreate(BaseModel):
     session_id: str  # one-time session_id from Emergent redirect
 
 
+class AdminLogin(BaseModel):
+    email: str
+    password: str
+
+
 class UserOut(BaseModel):
     user_id: str
     email: str
@@ -52,9 +65,9 @@ class GuestAuth(BaseModel):
 
 
 class AIToolRequest(BaseModel):
-    tool: str  # grammar | tone | smart_reply | vocab | translate | enhance | ask | paraphrase | emoji | longer | continue | summarize | synonyms | email | shorter | versify
+    tool: str
     text: str
-    options: Dict[str, Any] = Field(default_factory=dict)  # e.g. {"tone": "professional", "target_language": "Hindi"}
+    options: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AIToolResponse(BaseModel):
@@ -90,7 +103,7 @@ class HistoryCreate(BaseModel):
 
 
 class OCRRequest(BaseModel):
-    image_base64: str  # raw base64 (no data: prefix)
+    image_base64: str
 
 
 class OCRResponse(BaseModel):
@@ -99,12 +112,63 @@ class OCRResponse(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
-    voice: Optional[str] = None  # optional override
+    voice: Optional[str] = None
+
+
+class WhitelistAdd(BaseModel):
+    email: str
+    is_premium: bool = True
+
+
+class WhitelistToggle(BaseModel):
+    email: str
+    is_premium: bool
 
 
 # =====================================================
-# Auth Helpers
+# Helpers
 # =====================================================
+def _today_str() -> str:
+    return date.today().isoformat()
+
+
+async def _ensure_whitelist_sync(user: Dict[str, Any]) -> Dict[str, Any]:
+    """Reflect whitelist + admin flags onto the user doc if needed."""
+    email = (user.get("email") or "").lower().strip()
+    is_admin = email == ADMIN_EMAIL
+    wl = await db.whitelist.find_one({"email": email}, {"_id": 0})
+    is_premium = bool(wl and wl.get("is_premium")) or is_admin
+    if user.get("is_admin") != is_admin or user.get("is_premium") != is_premium:
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"is_admin": is_admin, "is_premium": is_premium}},
+        )
+        user["is_admin"] = is_admin
+        user["is_premium"] = is_premium
+    return user
+
+
+def _user_public(user: Dict[str, Any]) -> Dict[str, Any]:
+    """Public projection of a user document — includes usage info."""
+    today = _today_str()
+    usage_date = user.get("tool_usage_date")
+    usage_count = int(user.get("tool_usage_count") or 0) if usage_date == today else 0
+    is_premium = bool(user.get("is_premium") or user.get("is_admin"))
+    limit = FREE_TOOL_DAILY_LIMIT
+    return {
+        "user_id": user.get("user_id"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "picture": user.get("picture"),
+        "is_guest": bool(user.get("is_guest")),
+        "is_admin": bool(user.get("is_admin")),
+        "is_premium": is_premium,
+        "tool_uses_today": usage_count,
+        "tool_uses_limit": limit,
+        "tool_uses_remaining": max(0, limit - usage_count) if not is_premium else None,
+    }
+
+
 async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
@@ -112,7 +176,6 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[
     session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
     if not session:
         raise HTTPException(status_code=401, detail="Invalid session")
-    # Normalize expires_at
     expires_at = session.get("expires_at")
     if isinstance(expires_at, datetime):
         if expires_at.tzinfo is None:
@@ -122,7 +185,47 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[
     user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    user = await _ensure_whitelist_sync(user)
     return user
+
+
+async def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[Dict[str, Any]]:
+    """Returns user dict if authorized, else None (no error)."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    try:
+        return await get_current_user(authorization)
+    except HTTPException:
+        return None
+
+
+async def require_admin(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    user = await get_current_user(authorization)
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+async def _enforce_and_count_usage(user: Optional[Dict[str, Any]]) -> None:
+    """Raise 429 if free user has hit daily limit; else increment counter."""
+    if not user:
+        return  # Anonymous calls (e.g. guest flow without token) are not metered server-side.
+    if user.get("is_admin") or user.get("is_premium"):
+        return
+    today = _today_str()
+    current_count = int(user.get("tool_usage_count") or 0) if user.get("tool_usage_date") == today else 0
+    if current_count >= FREE_TOOL_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily free limit reached ({FREE_TOOL_DAILY_LIMIT}/day). Upgrade to Premium for unlimited access.",
+        )
+    new_count = current_count + 1
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"tool_usage_date": today, "tool_usage_count": new_count}},
+    )
+    user["tool_usage_date"] = today
+    user["tool_usage_count"] = new_count
 
 
 # =====================================================
@@ -130,7 +233,6 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[
 # =====================================================
 @api.post("/auth/session")
 async def create_session(body: SessionCreate):
-    """Exchange Emergent session_id (one-time) for a persistent session_token."""
     url = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
     try:
         async with httpx.AsyncClient(timeout=15.0) as http:
@@ -141,14 +243,13 @@ async def create_session(body: SessionCreate):
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"Auth service unreachable: {e}")
 
-    email = data.get("email")
+    email = (data.get("email") or "").lower().strip()
     name = data.get("name", email)
     picture = data.get("picture")
     session_token = data.get("session_token")
     if not email or not session_token:
         raise HTTPException(status_code=502, detail="Malformed auth response")
 
-    # Upsert user by email
     existing = await db.users.find_one({"email": email}, {"_id": 0})
     if existing:
         user_id = existing["user_id"]
@@ -165,11 +266,12 @@ async def create_session(body: SessionCreate):
                 "name": name,
                 "picture": picture,
                 "is_guest": False,
+                "is_admin": email == ADMIN_EMAIL,
+                "is_premium": email == ADMIN_EMAIL,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
 
-    # Store session
     await db.user_sessions.insert_one(
         {
             "session_token": session_token,
@@ -179,10 +281,9 @@ async def create_session(body: SessionCreate):
         }
     )
 
-    return {
-        "session_token": session_token,
-        "user": {"user_id": user_id, "email": email, "name": name, "picture": picture},
-    }
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    user_doc = await _ensure_whitelist_sync(user_doc)
+    return {"session_token": session_token, "user": _user_public(user_doc)}
 
 
 @api.post("/auth/guest")
@@ -195,6 +296,8 @@ async def create_guest():
         "name": "Guest",
         "picture": None,
         "is_guest": True,
+        "is_admin": False,
+        "is_premium": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(user)
@@ -206,16 +309,59 @@ async def create_guest():
             "expires_at": datetime.now(timezone.utc) + timedelta(days=30),
         }
     )
-    return {
-        "session_token": token,
-        "user": {"user_id": user_id, "email": user["email"], "name": user["name"], "picture": None, "is_guest": True},
-    }
+    return {"session_token": token, "user": _user_public(user)}
+
+
+@api.post("/auth/admin")
+async def admin_login(body: AdminLogin):
+    """Hidden admin login — only the configured admin email can use this."""
+    email = (body.email or "").lower().strip()
+    if email != ADMIN_EMAIL or not hmac.compare_digest(body.password or "", ADMIN_PASSWORD):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        user_id = existing["user_id"]
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "is_admin": True,
+                "is_premium": True,
+                "last_login": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+    else:
+        user_id = f"admin_{uuid.uuid4().hex[:12]}"
+        await db.users.insert_one(
+            {
+                "user_id": user_id,
+                "email": email,
+                "name": "Admin",
+                "picture": None,
+                "is_guest": False,
+                "is_admin": True,
+                "is_premium": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+    token = uuid.uuid4().hex
+    await db.user_sessions.insert_one(
+        {
+            "session_token": token,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(days=30),
+        }
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    return {"session_token": token, "user": _user_public(user_doc)}
 
 
 @api.get("/auth/me")
 async def me(authorization: Optional[str] = Header(None)):
     user = await get_current_user(authorization)
-    return {"user": user}
+    return {"user": _user_public(user)}
 
 
 @api.post("/auth/logout")
@@ -224,6 +370,70 @@ async def logout(authorization: Optional[str] = Header(None)):
         token = authorization.split(" ", 1)[1].strip()
         await db.user_sessions.delete_one({"session_token": token})
     return {"ok": True}
+
+
+# =====================================================
+# Admin Routes
+# =====================================================
+@api.get("/admin/whitelist")
+async def admin_list_whitelist(authorization: Optional[str] = Header(None)):
+    await require_admin(authorization)
+    entries = await db.whitelist.find({}, {"_id": 0}).sort("added_at", -1).to_list(500)
+    # Enrich with user info if user exists
+    enriched = []
+    for w in entries:
+        u = await db.users.find_one({"email": w["email"]}, {"_id": 0})
+        enriched.append({
+            "email": w["email"],
+            "is_premium": bool(w.get("is_premium")),
+            "added_at": w.get("added_at"),
+            "name": u.get("name") if u else None,
+            "has_account": bool(u),
+            "tool_uses_today": int(u.get("tool_usage_count") or 0) if u and u.get("tool_usage_date") == _today_str() else 0,
+        })
+    return {"items": enriched}
+
+
+@api.post("/admin/whitelist")
+async def admin_add_whitelist(body: WhitelistAdd, authorization: Optional[str] = Header(None)):
+    await require_admin(authorization)
+    email = (body.email or "").lower().strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Invalid email")
+    if email == ADMIN_EMAIL:
+        raise HTTPException(status_code=400, detail="Admin email cannot be whitelisted")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.whitelist.update_one(
+        {"email": email},
+        {"$set": {"email": email, "is_premium": bool(body.is_premium), "added_at": now}},
+        upsert=True,
+    )
+    # Sync user is_premium if account already exists
+    await db.users.update_one({"email": email}, {"$set": {"is_premium": bool(body.is_premium)}})
+    return {"ok": True, "email": email, "is_premium": bool(body.is_premium)}
+
+
+@api.put("/admin/whitelist")
+async def admin_toggle_whitelist(body: WhitelistToggle, authorization: Optional[str] = Header(None)):
+    await require_admin(authorization)
+    email = (body.email or "").lower().strip()
+    res = await db.whitelist.update_one(
+        {"email": email},
+        {"$set": {"is_premium": bool(body.is_premium)}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Email not whitelisted")
+    await db.users.update_one({"email": email}, {"$set": {"is_premium": bool(body.is_premium)}})
+    return {"ok": True, "email": email, "is_premium": bool(body.is_premium)}
+
+
+@api.delete("/admin/whitelist/{email}")
+async def admin_remove_whitelist(email: str, authorization: Optional[str] = Header(None)):
+    await require_admin(authorization)
+    email = email.lower().strip()
+    res = await db.whitelist.delete_one({"email": email})
+    await db.users.update_one({"email": email}, {"$set": {"is_premium": False}})
+    return {"deleted": res.deleted_count}
 
 
 # =====================================================
@@ -316,7 +526,6 @@ def _parse_numbered_list(raw: str) -> List[str]:
     lines = [ln.strip() for ln in raw.split("\n") if ln.strip()]
     items = []
     for ln in lines:
-        # Strip "1.", "1)", "- ", "* "
         for prefix in ("1.", "2.", "3.", "4.", "5.", "1)", "2)", "3)", "4)", "5)", "-", "*"):
             if ln.startswith(prefix):
                 ln = ln[len(prefix):].strip()
@@ -327,9 +536,12 @@ def _parse_numbered_list(raw: str) -> List[str]:
 
 
 @api.post("/ai/tool", response_model=AIToolResponse)
-async def ai_tool(req: AIToolRequest):
+async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None)):
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Text required")
+
+    user = await get_optional_user(authorization)
+    await _enforce_and_count_usage(user)
 
     system_message = _format_prompt(req.tool, req.options)
     session_id = f"tool-{uuid.uuid4().hex[:8]}"
@@ -361,11 +573,13 @@ async def ai_tool(req: AIToolRequest):
 # Chatbot
 # =====================================================
 @api.post("/ai/chat", response_model=ChatResponse)
-async def ai_chat(req: ChatRequest):
+async def ai_chat(req: ChatRequest, authorization: Optional[str] = Header(None)):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Message required")
 
-    # Load past messages for context
+    user = await get_optional_user(authorization)
+    await _enforce_and_count_usage(user)
+
     past = await db.chat_messages.find(
         {"session_id": req.session_id}, {"_id": 0}
     ).sort("created_at", 1).to_list(50)
@@ -381,8 +595,6 @@ async def ai_chat(req: ChatRequest):
         system_message=system,
     ).with_model("gemini", "gemini-3-flash-preview")
 
-    # Replay context as a single concatenated user message (LlmChat handles its own session,
-    # but to keep stateless across requests we feed prior turns)
     history_text = ""
     for m in past[-10:]:
         role = "User" if m.get("role") == "user" else "Assistant"
@@ -446,11 +658,9 @@ async def delete_history(item_id: str, authorization: Optional[str] = Header(Non
 async def ocr(req: OCRRequest):
     if not req.image_base64:
         raise HTTPException(status_code=400, detail="image_base64 required")
-    # Strip data URI prefix if present
     b64 = req.image_base64
     if "," in b64:
         b64 = b64.split(",", 1)[1]
-    # Quick sanity check
     try:
         base64.b64decode(b64, validate=False)
     except Exception:
@@ -485,48 +695,33 @@ async def ocr(req: OCRRequest):
 # =====================================================
 # TTS — Native-voice audio via OpenAI tts-1
 # =====================================================
-# Detect script → choose the most natural-sounding OpenAI voice for that language family.
-# OpenAI tts-1 voices are multilingual; we map by script so Hindi gets a warm voice and
-# English gets a crisp one.
 def _detect_voice(text: str) -> str:
     if not text:
         return "nova"
     for ch in text:
         code = ord(ch)
-        # Devanagari (Hindi, Marathi, Sanskrit)
         if 0x0900 <= code <= 0x097F:
             return "shimmer"
-        # Bengali / Assamese
         if 0x0980 <= code <= 0x09FF:
             return "shimmer"
-        # Tamil
         if 0x0B80 <= code <= 0x0BFF:
             return "nova"
-        # Telugu
         if 0x0C00 <= code <= 0x0C7F:
             return "nova"
-        # Kannada
         if 0x0C80 <= code <= 0x0CFF:
             return "nova"
-        # Malayalam
         if 0x0D00 <= code <= 0x0D7F:
             return "nova"
-        # Gujarati
         if 0x0A80 <= code <= 0x0AFF:
             return "shimmer"
-        # Punjabi (Gurmukhi)
         if 0x0A00 <= code <= 0x0A7F:
             return "shimmer"
-        # Odia
         if 0x0B00 <= code <= 0x0B7F:
             return "nova"
-        # Arabic / Urdu
         if 0x0600 <= code <= 0x06FF:
             return "fable"
-        # CJK Unified Ideographs
         if 0x4E00 <= code <= 0x9FFF:
             return "alloy"
-        # Hiragana / Katakana
         if 0x3040 <= code <= 0x30FF:
             return "alloy"
     return "nova"
@@ -566,7 +761,6 @@ async def root():
     return {"message": "KeyMind AI API", "ok": True}
 
 
-# Mount router
 app.include_router(api)
 
 app.add_middleware(
@@ -586,6 +780,7 @@ async def startup_indexes():
     await db.user_sessions.create_index("user_id")
     await db.history.create_index([("user_id", 1), ("created_at", -1)])
     await db.chat_messages.create_index([("session_id", 1), ("created_at", 1)])
+    await db.whitelist.create_index("email", unique=True)
     logger.info("Indexes ready")
 
 

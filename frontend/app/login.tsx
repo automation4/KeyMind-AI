@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  TextInput,
+  KeyboardAvoidingView,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
@@ -19,11 +22,19 @@ import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
 WebBrowser.maybeCompleteAuthSession();
 
+// Hidden admin email; if user types this, a password field appears.
+const ADMIN_EMAIL = "himthegreat@gmail.com";
+
 export default function Login() {
-  const { signInWithSessionId, signInAsGuest, user, loading } = useAuth();
+  const { signInWithSessionId, signInAsGuest, signInAsAdmin, user, loading } = useAuth();
   const router = useRouter();
-  const [busy, setBusy] = useState<"google" | "guest" | null>(null);
+  const [busy, setBusy] = useState<"google" | "guest" | "email" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL;
 
   useEffect(() => {
     if (loading || !user || busy) return;
@@ -35,7 +46,6 @@ export default function Login() {
 
   const parseSessionId = (url: string): string | null => {
     try {
-      // Parse hash fragment and query
       const hashIdx = url.indexOf("#");
       const hash = hashIdx >= 0 ? url.substring(hashIdx + 1) : "";
       const qIdx = url.indexOf("?");
@@ -91,7 +101,37 @@ export default function Login() {
     }
   };
 
-  // Web: process session_id on mount if present in URL
+  const handleEmailContinue = async () => {
+    setError(null);
+    const e = email.trim().toLowerCase();
+    if (!e) {
+      setError("Enter your email.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    if (e !== ADMIN_EMAIL) {
+      // Non-admin emails should use Google sign-in
+      setError("This app uses Google Sign-in. Tap CONTINUE WITH GOOGLE above.");
+      return;
+    }
+    if (!password) {
+      setError("Enter your admin password.");
+      return;
+    }
+    setBusy("email");
+    try {
+      await signInAsAdmin(e, password);
+      const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
+      router.replace(setupDone ? "/(tabs)" : "/setup");
+    } catch (err: any) {
+      setError(err?.detail || err?.message || "Invalid credentials");
+      setBusy(null);
+    }
+  };
+
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -114,58 +154,146 @@ export default function Login() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <View style={styles.logoBlock}>
-          <Text style={styles.logoText}>KM</Text>
-        </View>
-      </View>
-
-      <View style={styles.body}>
-        <Text style={styles.title}>Welcome to{"\n"}KeyMind AI</Text>
-        <Text style={styles.subtitle}>
-          Sign in to unlock multilingual grammar correction, 16 AI writing tools and your personal writing tutor.
-        </Text>
-
-        {error ? <Text style={styles.error} testID="login-error">{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[styles.googleBtn, busy === "google" && styles.btnDisabled]}
-          onPress={handleGoogle}
-          disabled={!!busy}
-          testID="login-google-btn"
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {busy === "google" ? (
-            <ActivityIndicator color={COLORS.text} />
-          ) : (
-            <>
-              <Ionicons name="logo-google" size={22} color={COLORS.text} />
-              <Text style={styles.googleBtnText}>CONTINUE WITH GOOGLE</Text>
-            </>
-          )}
-        </TouchableOpacity>
+          <View style={styles.header}>
+            <View style={styles.logoBlock}>
+              <Text style={styles.logoText}>KM</Text>
+            </View>
+          </View>
 
-        <TouchableOpacity
-          style={[styles.guestBtn, busy === "guest" && styles.btnDisabled]}
-          onPress={handleGuest}
-          disabled={!!busy}
-          testID="login-guest-btn"
-        >
-          {busy === "guest" ? (
-            <ActivityIndicator color={COLORS.bg} />
-          ) : (
-            <>
-              <Ionicons name="person-outline" size={20} color={COLORS.bg} />
-              <Text style={styles.guestBtnText}>CONTINUE AS GUEST</Text>
-            </>
-          )}
-        </TouchableOpacity>
+          <View style={styles.body}>
+            <Text style={styles.title}>Welcome to{"\n"}KeyMind AI</Text>
+            <Text style={styles.subtitle}>
+              Sign in to unlock multilingual grammar correction, 16 AI writing tools and your personal writing tutor.
+            </Text>
 
-        <Text style={styles.tos}>
-          By continuing you agree to our{"\n"}
-          <Text style={{ fontWeight: FONT.bold }}>Terms of Service</Text> and{" "}
-          <Text style={{ fontWeight: FONT.bold }}>Privacy Policy</Text>.
-        </Text>
-      </View>
+            {error ? <Text style={styles.error} testID="login-error">{error}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.googleBtn, busy === "google" && styles.btnDisabled]}
+              onPress={handleGoogle}
+              disabled={!!busy}
+              testID="login-google-btn"
+            >
+              {busy === "google" ? (
+                <ActivityIndicator color={COLORS.text} />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={22} color={COLORS.text} />
+                  <Text style={styles.googleBtnText}>CONTINUE WITH GOOGLE</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.guestBtn, busy === "guest" && styles.btnDisabled]}
+              onPress={handleGuest}
+              disabled={!!busy}
+              testID="login-guest-btn"
+            >
+              {busy === "guest" ? (
+                <ActivityIndicator color={COLORS.bg} />
+              ) : (
+                <>
+                  <Ionicons name="person-outline" size={20} color={COLORS.bg} />
+                  <Text style={styles.guestBtnText}>CONTINUE AS GUEST</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Email entry — hidden until tapped. Reveals password only if admin email. */}
+            {!showEmail ? (
+              <TouchableOpacity
+                onPress={() => setShowEmail(true)}
+                style={styles.emailLink}
+                testID="show-email-login"
+              >
+                <Text style={styles.emailLinkText}>Sign in with email</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.emailForm}>
+                <Text style={styles.fieldLabel}>EMAIL</Text>
+                <TextInput
+                  value={email}
+                  onChangeText={(v) => {
+                    setEmail(v);
+                    if (error) setError(null);
+                  }}
+                  placeholder="you@example.com"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                  style={styles.input}
+                  testID="login-email-input"
+                />
+                {isAdminEmail && (
+                  <>
+                    <Text style={[styles.fieldLabel, { marginTop: 14 }]}>PASSWORD</Text>
+                    <TextInput
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder="••••••••"
+                      placeholderTextColor={COLORS.textMuted}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      style={styles.input}
+                      testID="login-password-input"
+                    />
+                  </>
+                )}
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 14 }}>
+                  <TouchableOpacity
+                    style={[styles.emailBtn, { backgroundColor: COLORS.surface }]}
+                    onPress={() => {
+                      setShowEmail(false);
+                      setEmail("");
+                      setPassword("");
+                      setError(null);
+                    }}
+                    disabled={busy === "email"}
+                    testID="login-email-cancel"
+                  >
+                    <Text style={[styles.emailBtnText, { color: COLORS.text }]}>CANCEL</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.emailBtn,
+                      { backgroundColor: COLORS.text, flex: 2 },
+                      busy === "email" && styles.btnDisabled,
+                    ]}
+                    onPress={handleEmailContinue}
+                    disabled={busy === "email"}
+                    testID="login-email-continue"
+                  >
+                    {busy === "email" ? (
+                      <ActivityIndicator color={COLORS.bg} />
+                    ) : (
+                      <Text style={[styles.emailBtnText, { color: COLORS.bg }]}>
+                        {isAdminEmail ? "SIGN IN" : "CONTINUE"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            <Text style={styles.tos}>
+              By continuing you agree to our{"\n"}
+              <Text style={{ fontWeight: FONT.bold }}>Terms of Service</Text> and{" "}
+              <Text style={{ fontWeight: FONT.bold }}>Privacy Policy</Text>.
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -185,12 +313,12 @@ const styles = StyleSheet.create({
     ...SHADOW.brutal,
   },
   logoText: { fontSize: 38, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -2 },
-  body: { flex: 1, justifyContent: "center" },
-  title: { fontSize: 44, fontWeight: FONT.black, letterSpacing: -1.5, color: COLORS.text, lineHeight: 48 },
+  body: { flex: 1, justifyContent: "center", paddingTop: 16 },
+  title: { fontSize: 40, fontWeight: FONT.black, letterSpacing: -1.5, color: COLORS.text, lineHeight: 44 },
   subtitle: { marginTop: 14, fontSize: 15, lineHeight: 22, color: COLORS.textMuted, fontWeight: FONT.regular },
   error: { marginTop: 20, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13 },
   googleBtn: {
-    marginTop: 32,
+    marginTop: 28,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -218,5 +346,23 @@ const styles = StyleSheet.create({
   },
   guestBtnText: { fontSize: 14, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.bg },
   btnDisabled: { opacity: 0.6 },
+  emailLink: { marginTop: 18, alignSelf: "center", paddingVertical: 6 },
+  emailLinkText: { fontSize: 13, color: COLORS.textMuted, fontWeight: FONT.bold, textDecorationLine: "underline" },
+  emailForm: {
+    marginTop: 18, padding: 14, borderRadius: RADIUS.lg,
+    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surface,
+  },
+  fieldLabel: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted, marginBottom: 6 },
+  input: {
+    backgroundColor: COLORS.bg,
+    borderWidth: 2, borderColor: COLORS.border, borderRadius: RADIUS.md,
+    paddingHorizontal: 12, paddingVertical: 12,
+    fontSize: 15, color: COLORS.text, fontWeight: FONT.bold,
+  },
+  emailBtn: {
+    flex: 1, paddingVertical: 14, borderRadius: RADIUS.lg, alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
+  },
+  emailBtnText: { fontSize: 13, fontWeight: FONT.black, letterSpacing: 1.5 },
   tos: { marginTop: 24, fontSize: 12, color: COLORS.textMuted, textAlign: "center", lineHeight: 18 },
 });
