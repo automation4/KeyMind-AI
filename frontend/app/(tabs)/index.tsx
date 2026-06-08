@@ -8,7 +8,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
-  KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,7 +20,6 @@ import { TOOLS, TOOL_BY_ID } from "@/src/lib/tools";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useTheme } from "@/src/contexts/ThemeContext";
-import { ListenButton } from "@/src/components/ListenButton";
 import { DiffView } from "@/src/components/DiffView";
 
 const accentBg: Record<string, string> = {
@@ -50,6 +48,7 @@ export default function WriteScreen() {
   const [optionsOpen, setOptionsOpen] = useState<string | null>(null);
   const [appliedToast, setAppliedToast] = useState(false);
   const [pendingOptions, setPendingOptions] = useState<Record<string, string>>({});
+  const [toolPickerOpen, setToolPickerOpen] = useState(false);
 
   const wordCount = useMemo(
     () => (text.trim() ? text.trim().split(/\s+/).length : 0),
@@ -170,7 +169,6 @@ export default function WriteScreen() {
                 <Ionicons name="close-circle-outline" size={14} color={COLORS.text} />
                 <Text style={styles.smallBtnText}>CLEAR</Text>
               </TouchableOpacity>
-              <ListenButton text={text} small testID="listen-input-btn" />
             </View>
           </View>
         </View>
@@ -181,33 +179,48 @@ export default function WriteScreen() {
           </Text>
         ) : null}
 
-        {/* Tools toolbar */}
+        {/* Tools selector (dropdown) */}
         <Text style={styles.section}>AI WRITING TOOLS</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.toolsRow}
+        <TouchableOpacity
+          style={styles.dropdown}
+          onPress={() => setToolPickerOpen(true)}
+          disabled={loading}
+          testID="tools-dropdown"
         >
-          {TOOLS.map((t) => {
-            const isActive = activeTool === t.id && loading;
-            return (
-              <TouchableOpacity
-                key={t.id}
-                onPress={() => onPressTool(t.id)}
-                disabled={loading}
-                style={[styles.toolChip, { backgroundColor: accentBg[t.accent] }]}
-                testID={`tool-${t.id}`}
-              >
-                {isActive ? (
-                  <ActivityIndicator size="small" color={COLORS.text} />
-                ) : (
-                  <Ionicons name={t.icon} size={20} color={COLORS.text} />
-                )}
-                <Text style={styles.toolLabel}>{t.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+          <View style={styles.dropdownLeft}>
+            <View
+              style={[
+                styles.dropdownIcon,
+                {
+                  backgroundColor: activeTool
+                    ? accentBg[TOOL_BY_ID[activeTool]?.accent || "orange"]
+                    : COLORS.secondary,
+                },
+              ]}
+            >
+              <Ionicons
+                name={activeTool ? TOOL_BY_ID[activeTool]?.icon ?? "sparkles" : "sparkles"}
+                size={20}
+                color={COLORS.text}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dropdownLabel}>
+                {activeTool ? TOOL_BY_ID[activeTool]?.label : "Choose a tool"}
+              </Text>
+              <Text style={styles.dropdownSub} numberOfLines={1}>
+                {activeTool
+                  ? TOOL_BY_ID[activeTool]?.description
+                  : "16 tools — grammar, translate, paraphrase & more"}
+              </Text>
+            </View>
+          </View>
+          {loading && activeTool ? (
+            <ActivityIndicator size="small" color={COLORS.text} />
+          ) : (
+            <Ionicons name="chevron-down" size={20} color={COLORS.text} />
+          )}
+        </TouchableOpacity>
 
         {/* Result */}
         {loading && !result && (
@@ -250,7 +263,6 @@ export default function WriteScreen() {
                     <Ionicons name="copy-outline" size={14} color={COLORS.text} />
                     <Text style={styles.dismissText}>COPY</Text>
                   </TouchableOpacity>
-                  <ListenButton text={sug} small testID={`listen-suggestion-${idx}`} />
                 </View>
               </View>
             ))}
@@ -268,6 +280,55 @@ export default function WriteScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Tool picker dropdown modal */}
+      <Modal
+        visible={toolPickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setToolPickerOpen(false)}
+      >
+        <View style={styles.modalBg}>
+          <View style={[styles.sheet, { maxHeight: "80%" }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={[styles.section, { marginTop: 4 }]}>SELECT A TOOL</Text>
+            <ScrollView style={{ marginTop: 8 }} showsVerticalScrollIndicator={false}>
+              {TOOLS.map((t) => {
+                const selected = activeTool === t.id;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[styles.toolRow, selected && styles.toolRowActive]}
+                    onPress={() => {
+                      setToolPickerOpen(false);
+                      onPressTool(t.id);
+                    }}
+                    testID={`tool-${t.id}`}
+                  >
+                    <View style={[styles.toolRowIcon, { backgroundColor: accentBg[t.accent] }]}>
+                      <Ionicons name={t.icon} size={18} color={COLORS.text} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.toolRowLabel}>{t.label}</Text>
+                      <Text style={styles.toolRowSub} numberOfLines={1}>
+                        {t.description}
+                      </Text>
+                    </View>
+                    {selected && <Ionicons name="checkmark" size={20} color={COLORS.text} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: COLORS.surface, marginTop: 12 }]}
+              onPress={() => setToolPickerOpen(false)}
+              testID="tool-picker-close-btn"
+            >
+              <Text style={[styles.sheetBtnText, { color: COLORS.text }]}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Options modal */}
       <Modal visible={!!optionsOpen} transparent animationType="slide" onRequestClose={() => setOptionsOpen(null)}>
@@ -306,7 +367,6 @@ export default function WriteScreen() {
                 style={[styles.sheetBtn, { backgroundColor: COLORS.text, flex: 2 }]}
                 onPress={() => {
                   const tool = optionsOpen;
-                  const opts = { ...pendingOptions, target_language: pendingOptions.target_language?.toLowerCase() };
                   setOptionsOpen(null);
                   if (tool) runTool(tool, pendingOptions);
                 }}
@@ -355,6 +415,32 @@ const styles = StyleSheet.create({
   smallBtnText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.5 },
 
   section: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text, marginTop: 24, marginBottom: 12 },
+  dropdown: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border,
+    borderRadius: RADIUS.lg, paddingHorizontal: 14, paddingVertical: 14, gap: 12, ...SHADOW.brutalSm,
+  },
+  dropdownLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+  dropdownIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    borderWidth: 2, borderColor: COLORS.border,
+    alignItems: "center", justifyContent: "center",
+  },
+  dropdownLabel: { fontSize: 15, fontWeight: FONT.black, color: COLORS.text },
+  dropdownSub: { marginTop: 2, fontSize: 12, color: COLORS.textMuted, fontWeight: FONT.regular },
+  toolRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingVertical: 10, paddingHorizontal: 4,
+    borderBottomWidth: 1, borderColor: COLORS.borderSoft,
+  },
+  toolRowActive: { backgroundColor: COLORS.bg },
+  toolRowIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    borderWidth: 2, borderColor: COLORS.border,
+    alignItems: "center", justifyContent: "center",
+  },
+  toolRowLabel: { fontSize: 14, fontWeight: FONT.black, color: COLORS.text },
+  toolRowSub: { marginTop: 2, fontSize: 11, color: COLORS.textMuted, fontWeight: FONT.regular },
   toolsRow: { paddingRight: 24, gap: 8 },
   toolChip: {
     height: 80, width: 92, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.border,

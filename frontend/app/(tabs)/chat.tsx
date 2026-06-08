@@ -81,7 +81,7 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.eyebrow}>AI TUTOR</Text>
+          <Text style={styles.eyebrow}>ASK AI</Text>
           <Text style={styles.title}>Ask me anything.</Text>
         </View>
         <TouchableOpacity style={styles.resetBtn} onPress={reset} testID="chat-reset-btn">

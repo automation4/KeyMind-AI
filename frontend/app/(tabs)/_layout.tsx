@@ -60,7 +60,7 @@ export default function TabsLayout() {
       })}
     >
       <Tabs.Screen name="index" options={{ title: "Write" }} />
-      <Tabs.Screen name="chat" options={{ title: "Tutor" }} />
+      <Tabs.Screen name="chat" options={{ title: "Ask AI" }} />
       <Tabs.Screen name="history" options={{ title: "History" }} />
       <Tabs.Screen name="settings" options={{ title: "You" }} />
     </Tabs>
