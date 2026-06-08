@@ -19,18 +19,17 @@ import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useTheme, AccentName } from "@/src/contexts/ThemeContext";
 import { api } from "@/src/lib/api";
-import { UpgradePrompt } from "@/src/components/UpgradePrompt";
 
-type AccentDef = { id: AccentName; color: string; locked?: boolean };
+type AccentDef = { id: AccentName; color: string };
 
-// First 2 accents are free; the rest require premium.
+// All accents are available to everyone. KeyMind has no public premium tier.
 const ACCENTS: AccentDef[] = [
   { id: "orange", color: COLORS.primary },
   { id: "yellow", color: COLORS.secondary },
-  { id: "mint", color: COLORS.mint, locked: true },
-  { id: "peach", color: COLORS.peach, locked: true },
-  { id: "sky", color: COLORS.sky, locked: true },
-  { id: "lilac", color: COLORS.lilac, locked: true },
+  { id: "mint", color: COLORS.mint },
+  { id: "peach", color: COLORS.peach },
+  { id: "sky", color: COLORS.sky },
+  { id: "lilac", color: COLORS.lilac },
 ];
 
 type WhitelistEntry = {
@@ -49,9 +48,6 @@ export default function SettingsScreen() {
 
   const isPremium = !!(user?.is_premium || user?.is_admin);
   const isAdmin = !!user?.is_admin;
-
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeMessage, setUpgradeMessage] = useState<string | undefined>();
 
   // Admin state
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
@@ -130,11 +126,6 @@ export default function SettingsScreen() {
   };
 
   const pickAccent = (a: AccentDef) => {
-    if (a.locked && !isPremium) {
-      setUpgradeMessage("This accent color is a Premium theme. Upgrade to unlock all 6 colors.");
-      setUpgradeOpen(true);
-      return;
-    }
     setAccent(a.id);
   };
 
@@ -167,25 +158,20 @@ export default function SettingsScreen() {
               )}
               {isPremium && !isAdmin && (
                 <View style={[styles.pill, { backgroundColor: COLORS.mint }]}>
-                  <Text style={styles.pillText}>PREMIUM</Text>
-                </View>
-              )}
-              {!isPremium && (
-                <View style={[styles.pill, { backgroundColor: COLORS.surface }]}>
-                  <Text style={styles.pillText}>FREE</Text>
+                  <Text style={styles.pillText}>AD-FREE</Text>
                 </View>
               )}
             </View>
           </View>
         </View>
 
-        {/* Usage card (free tier only) */}
+        {/* Usage card (only when daily limit applies, i.e. not ad-free) */}
         {!isPremium && (
           <View style={styles.usageCard} testID="usage-card">
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={styles.usageLabel}>DAILY AI USAGE</Text>
               <Text style={styles.usageCount}>
-                {user?.tool_uses_today ?? 0} / {user?.tool_uses_limit ?? 5}
+                {user?.tool_uses_today ?? 0} / {user?.tool_uses_limit ?? 10}
               </Text>
             </View>
             <View style={styles.usageBarBg}>
@@ -195,32 +181,16 @@ export default function SettingsScreen() {
                   {
                     width: `${Math.min(
                       100,
-                      ((user?.tool_uses_today ?? 0) / (user?.tool_uses_limit || 5)) * 100,
+                      ((user?.tool_uses_today ?? 0) / (user?.tool_uses_limit || 10)) * 100,
                     )}%`,
                   },
                 ]}
               />
             </View>
             <Text style={styles.usageSub}>
-              Resets daily · Upgrade for unlimited AI tool uses.
+              Resets daily at midnight UTC · All features included.
             </Text>
           </View>
-        )}
-
-        {/* Pricing CTA */}
-        {!isPremium && (
-          <TouchableOpacity
-            style={[styles.proCard, { backgroundColor: COLORS.primary }]}
-            onPress={() => router.push("/pricing")}
-            testID="settings-pricing-btn"
-          >
-            <View>
-              <Text style={styles.proEyebrow}>UNLIMITED EVERYTHING</Text>
-              <Text style={styles.proTitle}>Go Premium</Text>
-              <Text style={styles.proSub}>₹500/mo · No ads · Unlimited AI tools</Text>
-            </View>
-            <Ionicons name="arrow-forward-circle" size={36} color={COLORS.text} />
-          </TouchableOpacity>
         )}
 
         {/* Admin panel */}
@@ -229,7 +199,7 @@ export default function SettingsScreen() {
             <Text style={styles.section}>ADMIN · WHITELIST</Text>
             <View style={styles.adminCard}>
               <Text style={styles.adminHelp}>
-                Add emails to grant manual premium access. Only listed users appear here.
+                Add emails to grant ad-free access. Listed users see no ads and have no daily AI limit.
               </Text>
 
               <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
@@ -337,32 +307,22 @@ export default function SettingsScreen() {
         </View>
 
         {/* Accent */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <Text style={styles.section}>ACCENT</Text>
-          {!isPremium && (
-            <Text style={styles.lockedHint}>4 LOCKED · UPGRADE</Text>
-          )}
-        </View>
+        <Text style={styles.section}>ACCENT</Text>
         <View style={[styles.row, { flexWrap: "wrap" }]}>
-          {ACCENTS.map((a) => {
-            const locked = a.locked && !isPremium;
-            return (
-              <TouchableOpacity
-                key={a.id}
-                onPress={() => pickAccent(a)}
-                style={[
-                  styles.accent,
-                  { backgroundColor: a.color },
-                  accent === a.id && SHADOW.brutalSm,
-                  locked && { opacity: 0.55 },
-                ]}
-                testID={`settings-accent-${a.id}`}
-              >
-                {accent === a.id && !locked && <Ionicons name="checkmark" size={20} color={COLORS.text} />}
-                {locked && <Ionicons name="lock-closed" size={16} color={COLORS.text} />}
-              </TouchableOpacity>
-            );
-          })}
+          {ACCENTS.map((a) => (
+            <TouchableOpacity
+              key={a.id}
+              onPress={() => pickAccent(a)}
+              style={[
+                styles.accent,
+                { backgroundColor: a.color },
+                accent === a.id && SHADOW.brutalSm,
+              ]}
+              testID={`settings-accent-${a.id}`}
+            >
+              {accent === a.id && <Ionicons name="checkmark" size={20} color={COLORS.text} />}
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Logout */}
@@ -376,12 +336,6 @@ export default function SettingsScreen() {
 
         <Text style={styles.footer}>KeyMind AI · v1.0 · Built for writers everywhere.</Text>
       </ScrollView>
-
-      <UpgradePrompt
-        visible={upgradeOpen}
-        onClose={() => setUpgradeOpen(false)}
-        message={upgradeMessage}
-      />
     </SafeAreaView>
   );
 }

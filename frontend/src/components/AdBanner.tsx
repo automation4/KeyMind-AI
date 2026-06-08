@@ -1,28 +1,23 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { View, Text, StyleSheet } from "react-native";
 
 import { COLORS, FONT, RADIUS, SHADOW } from "@/src/lib/theme";
 import { useAuth } from "@/src/contexts/AuthContext";
 
 /**
- * Placeholder ad banner shown to free-tier users only.
- * Visually clear it is an ad ("AD ·" label) and tap → Pricing screen.
- * No real ad SDK is wired — strictly a UX mockup for v1.
+ * Mock ad banner shown to all non-premium users.
+ * "Premium" here means admin-whitelisted ad-free users (not a paid public tier).
+ * Placeholder copy only — no real ad SDK is integrated yet.
  */
 export function AdBanner({ placement = "top" }: { placement?: "top" | "bottom" }) {
-  const router = useRouter();
   const { user } = useAuth();
 
-  // Hide for premium / admin
+  // Hide for ad-free (admin + whitelisted) users.
   if (!user) return null;
   if (user.is_premium || user.is_admin) return null;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => router.push("/pricing")}
+    <View
       style={[styles.banner, placement === "bottom" && styles.bottom]}
       testID="ad-banner"
     >
@@ -30,11 +25,14 @@ export function AdBanner({ placement = "top" }: { placement?: "top" | "bottom" }
         <Text style={styles.adPillText}>AD</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.title} numberOfLines={1}>Sponsored · Boost your writing in 60 sec ✨</Text>
-        <Text style={styles.sub} numberOfLines={1}>Tap here · Upgrade to remove ads</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          Sponsored · Your ad could be here ✨
+        </Text>
+        <Text style={styles.sub} numberOfLines={1}>
+          Mock placement · Real ads coming soon
+        </Text>
       </View>
-      <Ionicons name="arrow-forward" size={18} color={COLORS.text} />
-    </TouchableOpacity>
+    </View>
   );
 }
 

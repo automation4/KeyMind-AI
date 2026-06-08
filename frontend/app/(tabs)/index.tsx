@@ -91,7 +91,7 @@ export default function WriteScreen() {
 
   const isPremium = !!(user?.is_premium || user?.is_admin);
   const usesToday = user?.tool_uses_today ?? 0;
-  const usesLimit = user?.tool_uses_limit ?? 5;
+  const usesLimit = user?.tool_uses_limit ?? 10;
   const usesLeft = isPremium ? Infinity : Math.max(0, usesLimit - usesToday);
   const limitReached = !isPremium && usesLeft <= 0;
 
@@ -107,7 +107,7 @@ export default function WriteScreen() {
     }
     if (limitReached) {
       setUpgradeMessage(
-        `You've hit today's free limit of ${usesLimit} AI uses. Upgrade for unlimited writing.`,
+        `You've used all ${usesLimit} AI actions for today. Try again tomorrow.`,
       );
       setUpgradeOpen(true);
       return;
@@ -137,7 +137,7 @@ export default function WriteScreen() {
       if (e?.status === 429) {
         setUpgradeMessage(
           e?.detail ||
-            `Daily free limit reached (${usesLimit}/day). Upgrade for unlimited AI tool uses.`,
+            `Daily limit reached (${usesLimit}/day). Try again tomorrow.`,
         );
         setUpgradeOpen(true);
         refreshUser();
@@ -410,7 +410,7 @@ export default function WriteScreen() {
                     refreshUser();
                   } catch (e: any) {
                     if (e?.status === 429) {
-                      setUpgradeMessage(e?.detail || "Daily free limit reached. Upgrade for unlimited.");
+                      setUpgradeMessage(e?.detail || "Daily limit reached. Try again tomorrow.");
                       setUpgradeOpen(true);
                       refreshUser();
                     } else {

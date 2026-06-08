@@ -31,7 +31,7 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "himthegreat@gmail.com").lower().str
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "aa$fufm2q")
 
 # Free-tier daily AI usage limit (any tool, any combination)
-FREE_TOOL_DAILY_LIMIT = int(os.environ.get("FREE_TOOL_DAILY_LIMIT", "5"))
+FREE_TOOL_DAILY_LIMIT = int(os.environ.get("FREE_TOOL_DAILY_LIMIT", "10"))
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -220,7 +220,7 @@ async def _enforce_and_count_usage(user: Optional[Dict[str, Any]]) -> None:
     if current_count >= FREE_TOOL_DAILY_LIMIT:
         raise HTTPException(
             status_code=429,
-            detail=f"Daily free limit reached ({FREE_TOOL_DAILY_LIMIT}/day). Upgrade to Premium for unlimited access.",
+            detail=f"Daily limit reached ({FREE_TOOL_DAILY_LIMIT}/day). Resets at midnight UTC.",
         )
     new_count = current_count + 1
     await db.users.update_one(
@@ -636,15 +636,11 @@ def _vocab_payload_valid(data: Optional[Dict[str, Any]], target_language: str) -
     if not _text_matches_script(mt, target_language):
         return False
     tenses = data.get("tenses") or {}
-    # At least one tense translation should match the script (LLM may sometimes leave a field blank)
-    any_translated = False
     for k in ("past", "present", "future"):
         row = tenses.get(k) or {}
         tr = (row.get("translated") or "").strip()
-        if tr:
-            any_translated = True
-            if not _text_matches_script(tr, target_language):
-                return False
+        if tr and not _text_matches_script(tr, target_language):
+            return False
     return True
 
 

@@ -7,53 +7,30 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { storage } from "@/src/utils/storage";
 import { useTheme, AccentName } from "@/src/contexts/ThemeContext";
-import { useAuth } from "@/src/contexts/AuthContext";
-import { UpgradePrompt } from "@/src/components/UpgradePrompt";
 
 const LANGUAGES = [
   "English", "Hindi", "Sanskrit", "Hinglish", "Bengali", "Tamil", "Telugu", "Marathi",
   "Gujarati", "Kannada", "Malayalam", "Punjabi", "Odia", "Urdu", "Assamese",
 ];
 
-const ACCENTS: { id: AccentName; color: string; label: string; locked?: boolean }[] = [
+const ACCENTS: { id: AccentName; color: string; label: string }[] = [
   { id: "orange", color: COLORS.primary, label: "Orange" },
   { id: "yellow", color: COLORS.secondary, label: "Butter" },
-  { id: "mint", color: COLORS.mint, label: "Mint", locked: true },
-  { id: "peach", color: COLORS.peach, label: "Peach", locked: true },
-  { id: "sky", color: COLORS.sky, label: "Sky", locked: true },
-  { id: "lilac", color: COLORS.lilac, label: "Lilac", locked: true },
+  { id: "mint", color: COLORS.mint, label: "Mint" },
+  { id: "peach", color: COLORS.peach, label: "Peach" },
+  { id: "sky", color: COLORS.sky, label: "Sky" },
+  { id: "lilac", color: COLORS.lilac, label: "Lilac" },
 ];
-
-const FREE_LANG_LIMIT = 3;
 
 export default function Setup() {
   const router = useRouter();
   const { mode, accent, setMode, setAccent } = useTheme();
-  const { user } = useAuth();
-  const isPremium = !!(user?.is_premium || user?.is_admin);
   const [selectedLangs, setSelectedLangs] = useState<string[]>(["English", "Hindi"]);
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeMessage, setUpgradeMessage] = useState<string | undefined>();
 
   const toggleLang = (l: string) => {
-    setSelectedLangs((prev) => {
-      if (prev.includes(l)) return prev.filter((x) => x !== l);
-      if (!isPremium && prev.length >= FREE_LANG_LIMIT) {
-        setUpgradeMessage(`Free plan supports up to ${FREE_LANG_LIMIT} languages. Upgrade for all 50+.`);
-        setUpgradeOpen(true);
-        return prev;
-      }
-      return [...prev, l];
-    });
-  };
-
-  const pickAccent = (a: typeof ACCENTS[number]) => {
-    if (a.locked && !isPremium) {
-      setUpgradeMessage("This accent is a Premium theme. Upgrade to unlock all 6 colors.");
-      setUpgradeOpen(true);
-      return;
-    }
-    setAccent(a.id);
+    setSelectedLangs((prev) =>
+      prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l],
+    );
   };
 
   const finish = async () => {
@@ -71,25 +48,18 @@ export default function Setup() {
 
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
           <Text style={styles.section}>LANGUAGES YOU WRITE IN</Text>
-          {!isPremium && (
-            <Text style={styles.langHint} testID="setup-lang-hint">
-              {selectedLangs.length}/{FREE_LANG_LIMIT} · FREE
-            </Text>
-          )}
+          <Text style={styles.langHint} testID="setup-lang-hint">
+            {selectedLangs.length} SELECTED
+          </Text>
         </View>
         <View style={styles.chips}>
           {LANGUAGES.map((l) => {
             const active = selectedLangs.includes(l);
-            const wouldExceed = !active && !isPremium && selectedLangs.length >= FREE_LANG_LIMIT;
             return (
               <TouchableOpacity
                 key={l}
                 onPress={() => toggleLang(l)}
-                style={[
-                  styles.chip,
-                  active && styles.chipActive,
-                  wouldExceed && { opacity: 0.45 },
-                ]}
+                style={[styles.chip, active && styles.chipActive]}
                 testID={`setup-lang-${l.toLowerCase()}`}
               >
                 {active ? <Ionicons name="checkmark" size={14} color={COLORS.bg} /> : null}
@@ -124,30 +94,22 @@ export default function Setup() {
           ))}
         </View>
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <Text style={styles.section}>ACCENT COLOR</Text>
-          {!isPremium && <Text style={styles.langHint}>4 LOCKED</Text>}
-        </View>
+        <Text style={styles.section}>ACCENT COLOR</Text>
         <View style={styles.accents}>
-          {ACCENTS.map((a) => {
-            const locked = a.locked && !isPremium;
-            return (
-              <TouchableOpacity
-                key={a.id}
-                onPress={() => pickAccent(a)}
-                style={[
-                  styles.accent,
-                  { backgroundColor: a.color },
-                  accent === a.id && styles.accentActive,
-                  locked && { opacity: 0.55 },
-                ]}
-                testID={`setup-accent-${a.id}`}
-              >
-                {accent === a.id && !locked ? <Ionicons name="checkmark" size={20} color={COLORS.text} /> : null}
-                {locked && <Ionicons name="lock-closed" size={16} color={COLORS.text} />}
-              </TouchableOpacity>
-            );
-          })}
+          {ACCENTS.map((a) => (
+            <TouchableOpacity
+              key={a.id}
+              onPress={() => setAccent(a.id)}
+              style={[
+                styles.accent,
+                { backgroundColor: a.color },
+                accent === a.id && styles.accentActive,
+              ]}
+              testID={`setup-accent-${a.id}`}
+            >
+              {accent === a.id ? <Ionicons name="checkmark" size={20} color={COLORS.text} /> : null}
+            </TouchableOpacity>
+          ))}
         </View>
 
         <TouchableOpacity style={styles.cta} onPress={finish} testID="setup-finish-btn">
@@ -155,12 +117,6 @@ export default function Setup() {
           <Ionicons name="arrow-forward" size={22} color={COLORS.bg} />
         </TouchableOpacity>
       </ScrollView>
-
-      <UpgradePrompt
-        visible={upgradeOpen}
-        onClose={() => setUpgradeOpen(false)}
-        message={upgradeMessage}
-      />
     </SafeAreaView>
   );
 }
@@ -184,22 +140,22 @@ const styles = StyleSheet.create({
   chipTextActive: { color: COLORS.bg },
   themeRow: { flexDirection: "row", gap: 12 },
   themeCard: {
-    flex: 1, padding: 20, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border,
-    alignItems: "center", justifyContent: "center", gap: 8, height: 100,
+    flex: 1, alignItems: "center", justifyContent: "center", gap: 8,
+    paddingVertical: 24, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.borderSoft,
   },
-  themeCardActive: { ...SHADOW.brutal },
-  themeLabel: { fontSize: 14, fontWeight: FONT.bold },
+  themeCardActive: { borderColor: COLORS.border, ...SHADOW.brutalSm },
+  themeLabel: { fontSize: 14, fontWeight: FONT.black, letterSpacing: 1 },
   accents: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   accent: {
-    width: 56, height: 56, borderRadius: RADIUS.md,
-    borderWidth: 2, borderColor: COLORS.border,
+    width: 56, height: 56, borderRadius: 18, borderWidth: 2, borderColor: COLORS.border,
     alignItems: "center", justifyContent: "center",
   },
-  accentActive: { ...SHADOW.brutalSm },
+  accentActive: { ...SHADOW.brutalSm, transform: [{ scale: 1.06 }] },
   cta: {
-    marginTop: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
-    backgroundColor: COLORS.text, borderWidth: 3, borderColor: COLORS.border,
-    borderRadius: RADIUS.lg, paddingVertical: 18, ...SHADOW.brutal,
+    marginTop: 40, paddingVertical: 16,
+    borderRadius: RADIUS.lg, backgroundColor: COLORS.text,
+    flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10,
+    borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutal,
   },
-  ctaText: { fontSize: 15, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.bg },
+  ctaText: { color: COLORS.bg, fontSize: 16, fontWeight: FONT.black, letterSpacing: 2 },
 });
