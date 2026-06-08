@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useAuth } from "@/src/contexts/AuthContext";
+import { storage } from "@/src/utils/storage";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -25,10 +26,12 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && user) {
-      router.replace("/(tabs)");
-    }
-  }, [loading, user, router]);
+    if (loading || !user || busy) return;
+    (async () => {
+      const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
+      router.replace(setupDone ? "/(tabs)" : "/setup");
+    })();
+  }, [loading, user, busy, router]);
 
   const parseSessionId = (url: string): string | null => {
     try {
