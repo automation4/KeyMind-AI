@@ -18,17 +18,19 @@ export type VocabData = {
   meaning_simple?: string;
   tricky_words?: string[];
   meaning_translated?: string;
+  meaning_transliterated?: string;
   synonyms?: string[];
   antonyms?: string[];
   spoken_usage?: string;
   spoken_usage_translated?: string;
+  spoken_usage_transliterated?: string;
   native_alternative?: string;
   native_alternative_why?: string;
   memory_tip?: string;
   tenses?: {
-    past?: { english?: string; translated?: string };
-    present?: { english?: string; translated?: string };
-    future?: { english?: string; translated?: string };
+    past?: { english?: string; translated?: string; transliterated?: string };
+    present?: { english?: string; translated?: string; transliterated?: string };
+    future?: { english?: string; translated?: string; transliterated?: string };
   };
 };
 
@@ -53,6 +55,45 @@ export const VOCAB_LANGUAGES = [
   "Chinese",
 ] as const;
 export type VocabLanguage = (typeof VOCAB_LANGUAGES)[number];
+
+// Label shown above the Latin-script transliteration (Hinglish for Hindi, Tanglish for Tamil, etc.)
+function romanLabel(lang: VocabLanguage): string {
+  switch (lang) {
+    case "Hindi":
+    case "Sanskrit":
+    case "Marathi":
+      return "HINGLISH";
+    case "Tamil":
+      return "TANGLISH";
+    case "Telugu":
+      return "TENGLISH";
+    case "Bengali":
+      return "BANGLISH";
+    case "Gujarati":
+      return "GUJLISH";
+    case "Kannada":
+      return "KANGLISH";
+    case "Malayalam":
+      return "MANGLISH";
+    case "Punjabi":
+      return "PUNGLISH";
+    case "Urdu":
+      return "ROMAN URDU";
+    case "Arabic":
+      return "ROMAN ARABIC";
+    case "Japanese":
+      return "ROMAJI";
+    case "Chinese":
+      return "PINYIN";
+    default:
+      return "ROMAN";
+  }
+}
+
+// Some languages already use the Latin alphabet — no transliteration line needed.
+function needsRoman(lang: VocabLanguage): boolean {
+  return !["English", "Spanish", "French", "German"].includes(lang);
+}
 
 type Props = {
   data: VocabData;
@@ -168,15 +209,24 @@ export function VocabCard({
             “{data.spoken_usage}”
           </Text>
           {data.spoken_usage_translated && !loading ? (
-            <View style={styles.spokenNativeRow}>
+            <View style={styles.translatedLine}>
               <Text style={styles.spokenNative} selectable>
                 {data.spoken_usage_translated}
               </Text>
               <ListenButton
                 text={data.spoken_usage_translated}
                 small
+                compact
                 testID="listen-spoken-translated"
               />
+            </View>
+          ) : null}
+          {data.spoken_usage_transliterated && needsRoman(language) && !loading ? (
+            <View style={styles.translitWrap}>
+              <Text style={styles.translitLabel}>{romanLabel(language)}</Text>
+              <Text style={styles.translitText} selectable>
+                {data.spoken_usage_transliterated}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -274,14 +324,24 @@ export function VocabCard({
             <Text style={styles.loadingText}>Translating to {language}…</Text>
           </View>
         ) : (
-          <View style={styles.translatedRow}>
-            <Text style={styles.meaningNative} selectable testID="vocab-translated">
-              {data.meaning_translated || "—"}
-            </Text>
-            {data.meaning_translated ? (
-              <ListenButton text={data.meaning_translated} small testID="listen-translated" />
+          <>
+            <View style={styles.translatedLine}>
+              <Text style={styles.meaningNative} selectable testID="vocab-translated">
+                {data.meaning_translated || "—"}
+              </Text>
+              {data.meaning_translated ? (
+                <ListenButton text={data.meaning_translated} small compact testID="listen-translated" />
+              ) : null}
+            </View>
+            {data.meaning_transliterated && needsRoman(language) ? (
+              <View style={styles.translitWrap}>
+                <Text style={styles.translitLabel}>{romanLabel(language)}</Text>
+                <Text style={styles.translitText} selectable testID="vocab-transliterated">
+                  {data.meaning_transliterated}
+                </Text>
+              </View>
             ) : null}
-          </View>
+          </>
         )}
       </View>
 
@@ -297,22 +357,37 @@ export function VocabCard({
                 <View style={styles.tenseBadge}>
                   <Text style={styles.tenseBadgeText}>{t.toUpperCase()}</Text>
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, gap: 6 }}>
                   {row.english ? (
-                    <View style={styles.tenseLine}>
+                    <View style={styles.translatedLine}>
                       <Text style={styles.tenseEn} selectable>
                         {row.english}
                       </Text>
-                      <ListenButton text={row.english} small testID={`listen-tense-${t}-en`} />
+                      <ListenButton
+                        text={row.english}
+                        small
+                        compact
+                        testID={`listen-tense-${t}-en`}
+                      />
                     </View>
                   ) : null}
                   {row.translated && !loading ? (
-                    <View style={styles.tenseLine}>
+                    <View style={styles.translatedLine}>
                       <Text style={styles.tenseNative} selectable>
                         {row.translated}
                       </Text>
-                      <ListenButton text={row.translated} small testID={`listen-tense-${t}-tr`} />
+                      <ListenButton
+                        text={row.translated}
+                        small
+                        compact
+                        testID={`listen-tense-${t}-tr`}
+                      />
                     </View>
+                  ) : null}
+                  {row.transliterated && needsRoman(language) && !loading ? (
+                    <Text style={styles.tenseTranslit} selectable>
+                      {row.transliterated}
+                    </Text>
                   ) : null}
                 </View>
               </View>
@@ -370,8 +445,39 @@ const styles = StyleSheet.create({
   wordChipText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.text },
 
   spokenEn: { fontSize: 14, color: COLORS.text, lineHeight: 22, fontWeight: FONT.bold, fontStyle: "italic" },
-  spokenNativeRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 2 },
-  spokenNative: { flex: 1, minWidth: 180, fontSize: 14, color: COLORS.text, lineHeight: 22, fontWeight: FONT.bold, opacity: 0.85 },
+  spokenNative: { flex: 1, minWidth: 0, fontSize: 14, color: COLORS.text, lineHeight: 22, fontWeight: FONT.bold, opacity: 0.85 },
+
+  // Shared row for "native-script text + compact LISTEN" — text flexes, icon stays small on the right.
+  translatedLine: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  // Latin-script transliteration block (Hinglish / Tanglish / Tenglish / Romaji / Pinyin etc.)
+  translitWrap: {
+    marginTop: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    backgroundColor: COLORS.bg,
+    gap: 2,
+  },
+  translitLabel: {
+    fontSize: 9,
+    fontWeight: FONT.black,
+    letterSpacing: 1.5,
+    color: COLORS.textMuted,
+  },
+  translitText: {
+    fontSize: 13,
+    color: COLORS.text,
+    lineHeight: 19,
+    fontWeight: FONT.bold,
+    fontStyle: "italic",
+  },
 
   altCard: {
     padding: 12, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.border,
@@ -406,8 +512,7 @@ const styles = StyleSheet.create({
   langChipTextActive: { color: COLORS.bg },
   loadingRow: { flexDirection: "row", gap: 8, alignItems: "center", paddingVertical: 6 },
   loadingText: { fontSize: 12, fontWeight: FONT.bold, color: COLORS.textMuted },
-  translatedRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
-  meaningNative: { flex: 1, minWidth: 200, fontSize: 16, color: COLORS.text, lineHeight: 24, fontWeight: FONT.bold },
+  meaningNative: { flex: 1, minWidth: 0, fontSize: 16, color: COLORS.text, lineHeight: 24, fontWeight: FONT.bold },
 
   tenseRow: {
     flexDirection: "row", gap: 10, alignItems: "flex-start",
@@ -419,7 +524,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   tenseBadgeText: { fontSize: 10, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1 },
-  tenseLine: { flexDirection: "row", alignItems: "center", gap: 8 },
-  tenseEn: { flex: 1, fontSize: 13, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 19 },
-  tenseNative: { flex: 1, marginTop: 4, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 21, opacity: 0.85 },
+  tenseEn: { flex: 1, minWidth: 0, fontSize: 13, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 19 },
+  tenseNative: { flex: 1, minWidth: 0, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 21, opacity: 0.85 },
+  tenseTranslit: { fontSize: 12, color: COLORS.textMuted, fontWeight: FONT.bold, lineHeight: 18, fontStyle: "italic" },
 });

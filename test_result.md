@@ -119,10 +119,10 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "POST /api/ai/tool with tool=vocab returns data with word, part_of_speech, meaning_simple, meaning_translated (native script), synonyms[], antonyms[], spoken_usage, spoken_usage_translated, native_alternative, native_alternative_why, memory_tip, tenses{past,present,future}. Script validation+retry path triggers when LLM falls back to Devanagari for Telugu/Tamil/Kannada/Malayalam/Gujarati/Punjabi/Urdu/Bengali. Verified manually with target_language=Telugu and word=resilient — Telugu script returned correctly."
+        comment: "Schema now also includes meaning_transliterated, spoken_usage_transliterated, and tenses.{past,present,future}.transliterated — Latin-alphabet phonetic readings (Hinglish/Tanglish/Tenglish/Banglish/Romaji/Pinyin/etc.). For Latin-script targets (English/Spanish/French/German) these MUST be empty strings. Verified manually with target_language=Hindi (Hinglish populated) and target_language=Telugu (Tenglish populated)."
 
 frontend:
-  - task: "DescribeCard (VocabCard) renders new fields with ListenButton"
+  - task: "DescribeCard renders transliteration + fixes tense alignment"
     implemented: true
     working: "NA"
     file: "/app/frontend/src/components/VocabCard.tsx"
@@ -132,7 +132,7 @@ frontend:
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "VocabCard now renders synonyms (mint chips), antonyms (peach chips), spoken_usage with translated counterpart, native_alternative + why (lilac card), memory_tip (yellow card). ListenButton present on: word, simple meaning, spoken_usage (EN), spoken_usage_translated (newly added), native_alternative, memory_tip, translated meaning, and each tense (EN + translated). Tool label is 'Describe' (tools.ts), backend id remains 'vocab'."
+        comment: "ListenButton now supports compact (icon-only circle) mode. Tense rows and translated meaning row use compact LISTEN so the native-script text no longer gets squeezed into one-word-per-line vertical wrap. Added transliteration block below native script: shows label (HINGLISH / TANGLISH / TENGLISH / BANGLISH / GUJLISH / KANGLISH / MANGLISH / PUNGLISH / ROMAN URDU / ROMAN ARABIC / ROMAJI / PINYIN / ROMAN) + the Latin-script reading in italic. Block hidden when target_language is already Latin (English/Spanish/French/German) or when transliterated is empty."
 
 metadata:
   created_by: "main_agent"

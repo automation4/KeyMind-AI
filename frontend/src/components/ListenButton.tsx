@@ -10,6 +10,8 @@ type Props = {
   text: string;
   testID?: string;
   small?: boolean;
+  /** Icon-only compact circle button — use in tight rows (tenses, translated). */
+  compact?: boolean;
 };
 
 // Module-level player so only one audio plays at a time across the whole app.
@@ -28,7 +30,7 @@ async function stopAll() {
   try { Speech.stop(); } catch {}
 }
 
-export const ListenButton: React.FC<Props> = ({ text, testID, small }) => {
+export const ListenButton: React.FC<Props> = ({ text, testID, small, compact }) => {
   const [state, setState] = React.useState<"idle" | "loading" | "playing">("idle");
 
   const onPress = async () => {
@@ -92,6 +94,38 @@ export const ListenButton: React.FC<Props> = ({ text, testID, small }) => {
   };
 
   const isBusy = state !== "idle";
+  // Compact = icon-only circular button (no LISTEN label) — for tense rows etc.
+  if (compact) {
+    const dim = small ? 30 : 36;
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        style={{
+          width: dim,
+          height: dim,
+          borderRadius: dim / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: COLORS.secondary,
+          borderWidth: 2,
+          borderColor: COLORS.border,
+          ...SHADOW.brutalSm,
+        }}
+        testID={testID || "listen-btn"}
+        accessibilityLabel={state === "playing" ? "Stop audio" : "Listen"}
+      >
+        {state === "loading" ? (
+          <ActivityIndicator size="small" color={COLORS.text} />
+        ) : (
+          <Ionicons
+            name={state === "playing" ? "stop" : "volume-high"}
+            size={small ? 14 : 16}
+            color={COLORS.text}
+          />
+        )}
+      </TouchableOpacity>
+    );
+  }
   return (
     <TouchableOpacity
       onPress={onPress}
