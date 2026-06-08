@@ -134,6 +134,18 @@ frontend:
         agent: "main"
         comment: "ListenButton now supports compact (icon-only circle) mode. Tense rows and translated meaning row use compact LISTEN so the native-script text no longer gets squeezed into one-word-per-line vertical wrap. Added transliteration block below native script: shows label (HINGLISH / TANGLISH / TENGLISH / BANGLISH / GUJLISH / KANGLISH / MANGLISH / PUNGLISH / ROMAN URDU / ROMAN ARABIC / ROMAJI / PINYIN / ROMAN) + the Latin-script reading in italic. Block hidden when target_language is already Latin (English/Spanish/French/German) or when transliterated is empty."
 
+  - task: "Chat renders **bold** markdown (no more raw asterisks)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/chat.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added /app/frontend/src/components/MarkdownText.tsx — a lightweight inline markdown renderer for **bold**, *italic*, and `code`. Chat assistant bubbles now use MarkdownText instead of plain Text. ListenButton uses stripMarkdown(content) so TTS doesn't read out 'asterisk asterisk'. Backend prompt unchanged (LLM legitimately emits markdown). User bubbles still use plain Text since the user types plain text. Headings (### ...) and bullets (- ...) are stripped for TTS as well. Lint clean."
+
 metadata:
   created_by: "main_agent"
   version: "1.1"

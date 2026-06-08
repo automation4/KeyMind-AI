@@ -18,6 +18,7 @@ import { api } from "@/src/lib/api";
 import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
 import { MicButton } from "@/src/components/MicButton";
+import { MarkdownText, stripMarkdown } from "@/src/components/MarkdownText";
 import { storage } from "@/src/utils/storage";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -131,12 +132,23 @@ export default function ChatScreen() {
 
           {messages.map((m, i) => (
             <View key={i} style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.aiBubble]}>
-              <Text style={[styles.bubbleText, m.role === "user" && { color: COLORS.text }]}>
-                {m.content}
-              </Text>
+              {m.role === "user" ? (
+                <Text style={[styles.bubbleText, { color: COLORS.text }]}>{m.content}</Text>
+              ) : (
+                <MarkdownText
+                  text={m.content}
+                  style={styles.bubbleText}
+                  testID={`chat-msg-${i}`}
+                  selectable
+                />
+              )}
               {m.role === "assistant" && (
                 <View style={{ marginTop: 8 }}>
-                  <ListenButton text={m.content} small testID={`chat-listen-${i}`} />
+                  <ListenButton
+                    text={stripMarkdown(m.content)}
+                    small
+                    testID={`chat-listen-${i}`}
+                  />
                 </View>
               )}
             </View>
