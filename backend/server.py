@@ -473,14 +473,32 @@ TOOL_PROMPTS: Dict[str, str] = {
         "    \"future\":  {\"english\": \"<short example sentence using the word in FUTURE tense>\",  \"translated\": \"<same sentence in {target_language}>\"}\n"
         "  }\n"
         "}\n"
-        "RULES:\n"
-        "1. meaning_simple is ALWAYS plain English. tricky_words = unusual words from meaning_simple (or []).\n"
-        "2. All 'translated' fields must be in {target_language} using ITS OWN native script — never substitute another language.\n"
-        "3. If {target_language} is English, the 'translated' field should be the SAME as meaning_simple / english tense sentence.\n"
-        "4. If {target_language} is Hindi, use modern colloquial Hindi in Devanagari.\n"
-        "5. If {target_language} is Sanskrit, use CLASSICAL SANSKRIT (संस्कृतम्) — proper case (विभक्ति), verb conjugations like अहं गच्छामि / सः अपश्यत् / ते गमिष्यन्ति, sandhi and visarga marks. Never substitute Hindi.\n"
-        "6. For Tamil/Telugu/Bengali/Kannada/Malayalam/Punjabi/Gujarati/Urdu/Arabic/Japanese/Chinese — use that language's authentic script and grammar.\n"
-        "Output JSON ONLY."
+        "CRITICAL SCRIPT RULE (read TWICE before answering):\n"
+        "→ Every 'translated' field MUST be written in the NATIVE SCRIPT of {target_language}.\n"
+        "→ DO NOT default to Hindi/Devanagari unless target_language is exactly 'Hindi' or 'Sanskrit'.\n"
+        "→ If you cannot translate authentically into {target_language}, still attempt it — NEVER substitute another language.\n\n"
+        "REQUIRED SCRIPTS PER LANGUAGE (use ONLY the script listed):\n"
+        "• English   → Latin (English alphabet)              e.g. \"He sent a message.\"\n"
+        "• Hindi     → Devanagari (हिंदी)                       e.g. \"उसने संदेश भेजा।\"\n"
+        "• Sanskrit  → Devanagari, CLASSICAL grammar (संस्कृतम्) e.g. \"सः सन्देशम् अप्रेषयत्।\" (विभक्ति, सन्धि, विसर्ग)\n"
+        "• Bengali   → Bengali script (বাংলা)                  e.g. \"সে একটি বার্তা পাঠিয়েছিল।\"\n"
+        "• Tamil     → Tamil script (தமிழ்) — NO Devanagari    e.g. \"அவன் ஒரு செய்தியை அனுப்பினான்.\"\n"
+        "• Telugu    → Telugu script (తెలుగు) — NO Devanagari  e.g. \"అతను ఒక సందేశం పంపాడు.\"\n"
+        "• Marathi   → Devanagari (मराठी)                       e.g. \"त्याने एक संदेश पाठवला.\"\n"
+        "• Gujarati  → Gujarati script (ગુજરાતી) — NO Devanagari e.g. \"તેણે એક સંદેશ મોકલ્યો.\"\n"
+        "• Kannada   → Kannada script (ಕನ್ನಡ) — NO Devanagari   e.g. \"ಅವನು ಒಂದು ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಿದನು.\"\n"
+        "• Malayalam → Malayalam script (മലയാളം) — NO Devanagari e.g. \"അവൻ ഒരു സന്ദേശം അയച്ചു.\"\n"
+        "• Punjabi   → Gurmukhi (ਪੰਜਾਬੀ)                          e.g. \"ਉਸਨੇ ਇੱਕ ਸੁਨੇਹਾ ਭੇਜਿਆ।\"\n"
+        "• Urdu      → Perso-Arabic Nastaliq (اردو) RTL — NO Devanagari e.g. \"اس نے ایک پیغام بھیجا۔\"\n"
+        "• Arabic    → Arabic script (العربية) RTL\n"
+        "• Spanish   → Latin              French → Latin              German → Latin\n"
+        "• Japanese  → Kana + Kanji (日本語)\n"
+        "• Chinese   → Simplified Hanzi (中文)\n\n"
+        "OTHER RULES:\n"
+        "1. meaning_simple is ALWAYS plain English (~12 words max). tricky_words = unusual words from meaning_simple (or []).\n"
+        "2. If {target_language} is English, 'translated' fields equal meaning_simple / english tense sentence verbatim.\n"
+        "3. Verify before output: does 'meaning_translated' actually use the script listed above for {target_language}? If not, REWRITE it. Same check for each tense.translated.\n"
+        "Output JSON ONLY — no fences, no prose."
     ),
     "translate": (
         "Translate the following text to {target_language}. Preserve tone and meaning. "
@@ -548,6 +566,88 @@ def _format_prompt(tool: str, options: Dict[str, Any]) -> str:
 _JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
+# Unicode range per language for the `meaning_translated` script validation.
+# Each value is a list of (start_codepoint, end_codepoint) inclusive ranges.
+# Latin-script languages are handled by the `latin` keyword.
+LANG_SCRIPT_RANGES: Dict[str, Any] = {
+    "English":   "latin",
+    "Spanish":   "latin",
+    "French":    "latin",
+    "German":    "latin",
+    "Hindi":     [(0x0900, 0x097F)],           # Devanagari
+    "Sanskrit":  [(0x0900, 0x097F)],           # Devanagari
+    "Marathi":   [(0x0900, 0x097F)],           # Devanagari
+    "Bengali":   [(0x0980, 0x09FF)],           # Bengali
+    "Tamil":     [(0x0B80, 0x0BFF)],           # Tamil
+    "Telugu":    [(0x0C00, 0x0C7F)],           # Telugu
+    "Kannada":   [(0x0C80, 0x0CFF)],           # Kannada
+    "Malayalam": [(0x0D00, 0x0D7F)],           # Malayalam
+    "Gujarati":  [(0x0A80, 0x0AFF)],           # Gujarati
+    "Punjabi":   [(0x0A00, 0x0A7F)],           # Gurmukhi
+    "Urdu":      [(0x0600, 0x06FF), (0x0750, 0x077F), (0xFB50, 0xFDFF), (0xFE70, 0xFEFF)],  # Arabic + Urdu
+    "Arabic":    [(0x0600, 0x06FF), (0x0750, 0x077F), (0xFB50, 0xFDFF), (0xFE70, 0xFEFF)],
+    "Japanese":  [(0x3040, 0x309F), (0x30A0, 0x30FF), (0x4E00, 0x9FFF)],  # Hiragana, Katakana, Kanji
+    "Chinese":   [(0x4E00, 0x9FFF), (0x3400, 0x4DBF)],  # CJK
+}
+
+
+def _text_matches_script(text: str, language: str) -> bool:
+    """Return True if `text` is plausibly written in the script of `language`.
+    Allows ASCII punctuation/digits/spaces. For non-Latin languages we require
+    at least 60% of *letter* characters to fall in the expected Unicode range.
+    """
+    if not text or not language:
+        return True  # nothing to check
+    spec = LANG_SCRIPT_RANGES.get(language)
+    if spec is None:
+        return True  # unknown language → don't block
+    if spec == "latin":
+        # Most letters should be in Latin alphabet (ASCII A-Z/a-z + Latin Extended A/B)
+        letters = [c for c in text if c.isalpha()]
+        if not letters:
+            return True
+        latin_letters = sum(
+            1 for c in letters
+            if (0x0041 <= ord(c) <= 0x005A)
+            or (0x0061 <= ord(c) <= 0x007A)
+            or (0x00C0 <= ord(c) <= 0x024F)
+        )
+        return latin_letters / len(letters) >= 0.7
+    # Non-Latin: count letters in target Unicode ranges vs all letters
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return True
+    in_range = 0
+    for c in letters:
+        cp = ord(c)
+        for lo, hi in spec:
+            if lo <= cp <= hi:
+                in_range += 1
+                break
+    return in_range / len(letters) >= 0.6
+
+
+def _vocab_payload_valid(data: Optional[Dict[str, Any]], target_language: str) -> bool:
+    """Validate that a parsed vocab JSON has the correct script for the target language
+    in `meaning_translated` and tense translations."""
+    if not data or not isinstance(data, dict):
+        return False
+    mt = data.get("meaning_translated") or ""
+    if not _text_matches_script(mt, target_language):
+        return False
+    tenses = data.get("tenses") or {}
+    # At least one tense translation should match the script (LLM may sometimes leave a field blank)
+    any_translated = False
+    for k in ("past", "present", "future"):
+        row = tenses.get(k) or {}
+        tr = (row.get("translated") or "").strip()
+        if tr:
+            any_translated = True
+            if not _text_matches_script(tr, target_language):
+                return False
+    return True
+
+
 def _safe_parse_json(raw: str) -> Optional[Dict[str, Any]]:
     """Try to extract a JSON object from raw LLM output. Tolerates ```json fences and trailing prose."""
     if not raw:
@@ -609,6 +709,41 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
     data: Optional[Dict[str, Any]] = None
     if req.tool == "vocab":
         data = _safe_parse_json(raw)
+        target_lang = (req.options or {}).get("target_language", "English")
+        # Script validation: Gemini sometimes ignores the target language for
+        # less-common scripts (Telugu/Tamil/Kannada/Malayalam/Gujarati/Punjabi/Urdu/Bengali)
+        # and falls back to Hindi/Devanagari. Detect + retry once with a stronger prompt.
+        if not _vocab_payload_valid(data, target_lang):
+            logger.warning(
+                "Vocab translation failed script validation for %s. Retrying with stricter prompt.",
+                target_lang,
+            )
+            retry_system = (
+                system_message
+                + "\n\nIMPORTANT RETRY INSTRUCTION:\n"
+                f"Your previous response did NOT use the {target_lang} script. "
+                f"The user requested {target_lang}. You MUST write 'meaning_translated' "
+                f"and every tense.translated USING ONLY {target_lang}'s native script. "
+                "DO NOT use Hindi or Devanagari unless target is Hindi/Sanskrit/Marathi. "
+                "Re-emit the FULL JSON object with the corrected script. JSON ONLY."
+            )
+            retry_chat = LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=f"tool-retry-{uuid.uuid4().hex[:8]}",
+                system_message=retry_system,
+            ).with_model("gemini", "gemini-3-flash-preview")
+            try:
+                retry_reply = await retry_chat.send_message(UserMessage(text=req.text))
+                retry_raw = str(retry_reply).strip()
+                retry_data = _safe_parse_json(retry_raw)
+                if _vocab_payload_valid(retry_data, target_lang):
+                    data = retry_data
+                    raw = retry_raw
+                elif retry_data and not data:
+                    data = retry_data  # at least keep parsed JSON even if script imperfect
+                    raw = retry_raw
+            except Exception:
+                logger.exception("Vocab retry failed")
         # Keep suggestions as the raw text fallback; UI prefers `data` when present.
         suggestions = [raw]
     elif req.tool in multi_tools:
