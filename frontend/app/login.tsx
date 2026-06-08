@@ -42,7 +42,7 @@ export default function Login() {
     if (showEmail) return;
     if (tapResetRef.current) clearTimeout(tapResetRef.current);
     tapCountRef.current += 1;
-    if (tapCountRef.current >= 11) {
+    if (tapCountRef.current >= 22) {
       tapCountRef.current = 0;
       setShowEmail(true);
       return;
@@ -240,13 +240,9 @@ export default function Login() {
               )}
             </TouchableOpacity>
 
-            {/* Hidden admin form — revealed via 11 taps on KM logo. No visible toggle. */}
+            {/* Hidden admin form — revealed via 22 taps on KM logo. No visible toggle, no badge. */}
             {showEmail && (
               <View style={styles.emailForm}>
-                <View style={styles.adminBadgeRow}>
-                  <Ionicons name="shield-checkmark" size={14} color={COLORS.text} />
-                  <Text style={styles.adminBadgeText}>ADMIN ACCESS</Text>
-                </View>
                 <Text style={styles.fieldLabel}>EMAIL</Text>
                 <TextInput
                   value={email}
