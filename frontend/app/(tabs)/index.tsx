@@ -245,7 +245,7 @@ export default function WriteScreen() {
           />
           <View style={styles.inputFooter}>
             <Text style={styles.meta}>{wordCount} WORDS</Text>
-            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            <View style={styles.actionRow}>
               <TouchableOpacity
                 onPress={handleUpload}
                 disabled={ocrBusy}
@@ -255,9 +255,11 @@ export default function WriteScreen() {
                 {ocrBusy ? (
                   <ActivityIndicator size="small" color={COLORS.text} />
                 ) : (
-                  <Ionicons name="image-outline" size={15} color={COLORS.text} />
+                  <Ionicons name="image-outline" size={14} color={COLORS.text} />
                 )}
-                <Text style={styles.smallBtnText}>{ocrBusy ? "READING…" : "UPLOAD"}</Text>
+                <Text style={styles.smallBtnText} numberOfLines={1}>
+                  {ocrBusy ? "READING…" : "UPLOAD"}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => copy(text)}
@@ -265,8 +267,8 @@ export default function WriteScreen() {
                 style={styles.smallBtn}
                 testID="copy-input-btn"
               >
-                <Ionicons name="copy-outline" size={15} color={COLORS.text} />
-                <Text style={styles.smallBtnText}>COPY</Text>
+                <Ionicons name="copy-outline" size={14} color={COLORS.text} />
+                <Text style={styles.smallBtnText} numberOfLines={1}>COPY</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setText("")}
@@ -274,8 +276,8 @@ export default function WriteScreen() {
                 style={styles.smallBtn}
                 testID="clear-input-btn"
               >
-                <Ionicons name="close" size={15} color={COLORS.text} />
-                <Text style={styles.smallBtnText}>CLEAR</Text>
+                <Ionicons name="close" size={14} color={COLORS.text} />
+                <Text style={styles.smallBtnText} numberOfLines={1}>CLEAR</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -523,14 +525,23 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg, padding: 16, ...SHADOW.brutal,
   },
   input: { minHeight: 140, fontSize: 16, lineHeight: 22, color: COLORS.text, fontWeight: FONT.regular, textAlignVertical: "top" },
-  inputFooter: { marginTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 },
-  meta: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
+  inputFooter: { marginTop: 12, gap: 10 },
+  actionRow: { flexDirection: "row", gap: 8 },
   smallBtn: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill,
-    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.bg,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
   },
-  smallBtnText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.5 },
+  smallBtnText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.4 },
+  meta: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
 
   section: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text, marginTop: 24, marginBottom: 12 },
   dropdown: {
