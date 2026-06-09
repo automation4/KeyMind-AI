@@ -79,6 +79,14 @@ export default function ChatScreen() {
   const [busy, setBusy] = useState(false);
   const [vocabLang, setVocabLang] = useState<VocabLanguage>("Hindi");
   const scrollRef = useRef<ScrollView>(null);
+  // Track whether we should auto-scroll to bottom when ScrollView content size changes.
+  // Set to true ONLY right after a new message is added — prevents listen-button taps
+  // (or any other in-card state change that resizes content) from yanking the scroll.
+  const autoScrollOnce = useRef(false);
+  const scrollToBottom = () => {
+    autoScrollOnce.current = true;
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+  };
 
   useEffect(() => {
     (async () => {
@@ -102,6 +110,7 @@ export default function ChatScreen() {
     if (!message || !sessionId) return;
     setInput("");
     setMessages((m) => [...m, { role: "user", content: message }]);
+    scrollToBottom();
     setBusy(true);
 
     // Auto-detect: single word / "describe X" → fetch the rich Describe card.
@@ -120,7 +129,7 @@ export default function ChatScreen() {
               cardLanguage: vocabLang,
             },
           ]);
-          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+          scrollToBottom();
           setBusy(false);
           return;
         }
@@ -133,7 +142,7 @@ export default function ChatScreen() {
     try {
       const res = await api.chat(sessionId, message);
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+      scrollToBottom();
     } catch (e: any) {
       setMessages((m) => [
         ...m,
@@ -176,7 +185,15 @@ export default function ChatScreen() {
           ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 20, paddingBottom: 24 }}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => {
+            // Only scroll to the bottom when explicitly requested by the parent
+            // (i.e. after a new message was just added). This prevents in-card
+            // interactions like LISTEN button taps from jumping the scroll position.
+            if (autoScrollOnce.current) {
+              autoScrollOnce.current = false;
+              scrollRef.current?.scrollToEnd({ animated: true });
+            }
+          }}
         >
           {messages.length === 0 && (
             <View>

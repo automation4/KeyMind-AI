@@ -168,10 +168,6 @@ TOOL_PROMPTS: Dict[str, str] = {
         "Expand the text below into a more detailed version with relevant context. Preserve the original "
         "language and tone. Return ONLY the expanded text."
     ),
-    "continue": (
-        "Continue writing the text below naturally. Generate exactly 2 distinct continuation options. "
-        "Format as a numbered list (1., 2.) and nothing else. Match the original language."
-    ),
     "summarize": (
         "Summarize the text below concisely as 3-5 bullet points. Preserve the original language. "
         "Return ONLY the bullet points (use '- ' prefix)."
@@ -211,7 +207,7 @@ TOOL_PROMPTS: Dict[str, str] = {
 
 
 # Multi-suggestion tools — output is parsed as a numbered list (and pipe-split for synonyms/antonyms).
-MULTI_TOOLS = {"smart_reply", "paraphrase", "continue", "summarize", "synonyms", "antonyms", "idioms"}
+MULTI_TOOLS = {"smart_reply", "paraphrase", "summarize", "synonyms", "antonyms", "idioms"}
 
 
 # Chat system message (Ask AI tab).
