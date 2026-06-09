@@ -22,7 +22,7 @@ export const TOOLS: ToolDef[] = [
     options: [{ key: "tone", label: "Tone", choices: ["Professional", "Casual", "Formal", "Friendly", "Assertive", "Polite", "Humorous"] }],
   },
   { id: "smart_reply", label: "Smart Reply", icon: "chatbubble-ellipses", description: "3 contextual reply options", accent: "yellow", multi: true },
-  { id: "vocab", label: "Describe", icon: "book", description: "Deep word breakdown · synonyms, antonyms, memory tips & more", accent: "sky" },
+  { id: "vocab", label: "Describe", icon: "book", description: "Explain a word, phrase, or sentence with pronunciation & translation", accent: "sky" },
   {
     id: "translate",
     label: "Translate",
@@ -37,7 +37,6 @@ export const TOOLS: ToolDef[] = [
       },
     ],
   },
-  { id: "enhance", label: "Enhance", icon: "sparkles", description: "Improve vocabulary & flow", accent: "peach" },
   { id: "paraphrase", label: "Paraphrase", icon: "shuffle", description: "Rewrite differently (3 options)", accent: "mint", multi: true },
   { id: "longer", label: "Make Longer", icon: "expand", description: "Expand short text", accent: "sky" },
   { id: "summarize", label: "Summarize", icon: "list", description: "Condense to key points", accent: "peach", multi: true },
