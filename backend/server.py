@@ -629,7 +629,7 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
         logger.exception("AI tool failed")
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
 
-    multi_tools = {"smart_reply", "paraphrase", "continue", "summarize", "synonyms", "antonyms", "idioms"}
+    multi_tools = MULTI_TOOLS
     data: Optional[Dict[str, Any]] = None
     if req.tool == "grammar":
         # Grammar now returns a JSON object with corrected / explanation / examples.
