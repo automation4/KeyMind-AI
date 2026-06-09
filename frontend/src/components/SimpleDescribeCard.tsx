@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { COLORS, FONT, RADIUS, SHADOW } from "@/src/lib/theme";
 import { ListenButton } from "@/src/components/ListenButton";
+import { PronunciationBadge } from "@/src/components/PronunciationBadge";
 import {
   VocabData,
   VOCAB_LANGUAGES,
@@ -67,6 +68,10 @@ export const SimpleDescribeCard: React.FC<Props> = ({
               </Text>
             </View>
           ) : null}
+          <PronunciationBadge
+            word={data.word || ""}
+            pronunciation={data.pronunciation}
+          />
         </View>
       </View>
 

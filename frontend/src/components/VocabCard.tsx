@@ -11,10 +11,12 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { COLORS, FONT, RADIUS, SHADOW } from "@/src/lib/theme";
 import { ListenButton } from "@/src/components/ListenButton";
+import { PronunciationBadge } from "@/src/components/PronunciationBadge";
 
 export type VocabData = {
   word?: string;
   part_of_speech?: string;
+  pronunciation?: string;
   meaning_simple?: string;
   tricky_words?: string[];
   meaning_translated?: string;
@@ -136,6 +138,10 @@ export function VocabCard({
               <Text style={styles.posPillText}>{data.part_of_speech.toUpperCase()}</Text>
             </View>
           ) : null}
+          <PronunciationBadge
+            word={data.word || ""}
+            pronunciation={data.pronunciation}
+          />
         </View>
       </View>
 
