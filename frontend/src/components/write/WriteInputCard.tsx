@@ -15,6 +15,7 @@ import * as ImagePicker from "expo-image-picker";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { MicButton } from "@/src/components/MicButton";
+import { DictateLanguagePicker } from "@/src/components/DictateLanguagePicker";
 import { api } from "@/src/lib/api";
 
 type Props = {
@@ -129,7 +130,12 @@ export function WriteInputCard({
   };
 
   return (
-    <View style={styles.inputCard}>
+    <View style={styles.container}>
+      {/* Language chip above the card (top-right) */}
+      <View style={styles.langRow}>
+        <DictateLanguagePicker compact />
+      </View>
+      <View style={styles.inputCard}>
       <TextInput
         value={displayedText}
         onChangeText={(v) => {
@@ -145,7 +151,7 @@ export function WriteInputCard({
         }}
         multiline
         editable={!listening}
-        placeholder="Paste, type, or tap the mic to dictate…"
+        placeholder="Paste, type, or hold the mic to dictate…"
         placeholderTextColor={COLORS.textMuted}
         style={[
           styles.input,
@@ -205,11 +211,18 @@ export function WriteInputCard({
           </TouchableOpacity>
         </View>
       </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { gap: 6 },
+  langRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 2,
+  },
   inputCard: {
     backgroundColor: COLORS.surface,
     borderWidth: 2,
