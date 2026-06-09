@@ -632,7 +632,7 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
     multi_tools = MULTI_TOOLS
     data: Optional[Dict[str, Any]] = None
     if req.tool == "grammar":
-        # Grammar now returns a JSON object with corrected / explanation / examples.
+        # Grammar returns a JSON object with corrected / is_correct / explanation / examples.
         parsed = _safe_parse_json(raw)
         if isinstance(parsed, dict) and parsed.get("corrected"):
             corrected = str(parsed.get("corrected") or "").strip()
@@ -641,8 +641,18 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
             if not isinstance(examples, list):
                 examples = []
             examples = [str(e).strip() for e in examples if str(e).strip()][:5]
+            # Detect "no change needed" — trust model's flag, fall back to text comparison.
+            raw_correct = parsed.get("is_correct")
+            if isinstance(raw_correct, bool):
+                is_correct = raw_correct
+            else:
+                is_correct = corrected.strip().lower() == (req.text or "").strip().lower()
             suggestions = [corrected] if corrected else [raw]
-            data = {"explanation": explanation, "examples": examples}
+            data = {
+                "is_correct": is_correct,
+                "explanation": explanation,
+                "examples": examples,
+            }
         else:
             # Fallback: model returned plain text — keep current UX (single corrected text).
             suggestions = [raw]

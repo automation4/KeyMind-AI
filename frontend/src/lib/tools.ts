@@ -40,7 +40,6 @@ export const TOOLS: ToolDef[] = [
   { id: "enhance", label: "Enhance", icon: "sparkles", description: "Improve vocabulary & flow", accent: "peach" },
   { id: "paraphrase", label: "Paraphrase", icon: "shuffle", description: "Rewrite differently (3 options)", accent: "mint", multi: true },
   { id: "longer", label: "Make Longer", icon: "expand", description: "Expand short text", accent: "sky" },
-  { id: "continue", label: "Continue", icon: "arrow-forward", description: "Continue writing naturally", accent: "lilac", multi: true },
   { id: "summarize", label: "Summarize", icon: "list", description: "Condense to key points", accent: "peach", multi: true },
   { id: "synonyms", label: "Synonyms", icon: "swap-horizontal", description: "Context-aware synonyms", accent: "mint", multi: true },
   { id: "antonyms", label: "Antonyms", icon: "git-compare", description: "Opposite words for any term", accent: "peach", multi: true },

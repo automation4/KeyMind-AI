@@ -44,7 +44,16 @@ export function ResultSuggestion({
   return (
     <View style={styles.resultCard}>
       {result.tool === "grammar" && index === 0 ? (
-        <DiffView original={result.original} corrected={suggestion} />
+        result.data?.is_correct === true ? (
+          <View style={styles.perfectBanner}>
+            <Ionicons name="checkmark-circle" size={20} color={COLORS.text} />
+            <Text style={styles.perfectText} selectable>
+              {suggestion}
+            </Text>
+          </View>
+        ) : (
+          <DiffView original={result.original} corrected={suggestion} />
+        )
       ) : isWordList ? (
         <View style={styles.wordCardHeader}>
           <Text style={styles.wordCardWord} selectable>
@@ -90,11 +99,27 @@ export function ResultSuggestion({
 /** Grammar "WHY this change" + native-speaker examples block. */
 export function GrammarMetaCard({ data }: { data: any }) {
   if (!data) return null;
+  const isCorrect = data.is_correct === true;
   return (
-    <View style={styles.grammarMetaCard}>
+    <View
+      style={[
+        styles.grammarMetaCard,
+        isCorrect && styles.grammarMetaCardPerfect,
+      ]}
+      testID="grammar-meta-card"
+    >
       {data.explanation ? (
         <View style={{ gap: 6 }}>
-          <Text style={styles.metaLabel}>WHY THIS CHANGE</Text>
+          <View style={styles.metaHeader}>
+            {isCorrect ? (
+              <Ionicons name="checkmark-circle" size={16} color={COLORS.text} />
+            ) : (
+              <Ionicons name="information-circle" size={16} color={COLORS.text} />
+            )}
+            <Text style={styles.metaLabel}>
+              {isCorrect ? "LOOKS PERFECT" : "WHY THIS CHANGE"}
+            </Text>
+          </View>
           <Text style={styles.metaText} selectable>
             {data.explanation}
           </Text>
@@ -102,7 +127,11 @@ export function GrammarMetaCard({ data }: { data: any }) {
       ) : null}
       {Array.isArray(data.examples) && data.examples.length > 0 ? (
         <View style={{ gap: 8, marginTop: 12 }}>
-          <Text style={styles.metaLabel}>HOW NATIVE SPEAKERS USE IT</Text>
+          <Text style={styles.metaLabel}>
+            {isCorrect
+              ? "OTHER WAYS NATIVE SPEAKERS SAY THIS"
+              : "HOW NATIVE SPEAKERS USE IT"}
+          </Text>
           {(data.examples as string[]).map((ex, exIdx) => (
             <View key={exIdx} style={styles.exampleRow}>
               <Text style={styles.exampleText} selectable>
@@ -175,6 +204,33 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.lilac,
     gap: 6,
     ...SHADOW.brutalSm,
+  },
+  grammarMetaCardPerfect: {
+    backgroundColor: COLORS.mint,
+  },
+  metaHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  perfectBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.mint,
+    marginBottom: 4,
+  },
+  perfectText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    color: COLORS.text,
+    fontWeight: FONT.bold,
   },
   metaLabel: {
     fontSize: 10,
