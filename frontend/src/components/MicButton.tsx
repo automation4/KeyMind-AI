@@ -1,208 +1,364 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Animated, Easing, Alert, Linking,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Easing,
+  Alert,
+  Linking,
+  Platform,
+  Modal,
+  FlatList,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  useAudioRecorder,
-  useAudioRecorderState,
-  RecordingPresets,
-  setAudioModeAsync,
-  requestRecordingPermissionsAsync,
-  getRecordingPermissionsAsync,
-} from "expo-audio";
+import * as Haptics from "expo-haptics";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { COLORS, FONT, RADIUS, SHADOW } from "@/src/lib/theme";
-import { api } from "@/src/lib/api";
+import {
+  DICTATE_LANGUAGES,
+  DEFAULT_DICTATE_LANG,
+  findDictateLanguage,
+} from "@/src/lib/dictateLanguages";
+import { useStreamingSpeechRecognition } from "@/src/hooks/useStreamingSpeechRecognition";
 
 type Props = {
-  /** Receives the recognized text. Called once per successful transcription. */
-  onTranscribe: (text: string) => void;
-  /** Optional: tell Whisper which language to expect (e.g. "hi", "en"). Otherwise auto-detect. */
-  language?: string;
-  /** Size of the round button. */
+  /** Receives every committed (final) chunk. Multiple chunks may stream during one session. */
+  onFinal: (text: string) => void;
+  /** Receives the live (uncommitted) partial transcript. Empty string when no interim. */
+  onInterim?: (text: string) => void;
+  /** Optional callback when listening starts / stops. */
+  onListeningChange?: (listening: boolean) => void;
+  /** Size of the circular button. */
   size?: number;
-  /** Optional custom style for the wrapper. */
+  /** Optional wrapper style. */
   style?: any;
 };
 
-const MAX_RECORD_SECONDS = 60;
+const LANG_STORAGE_KEY = "keymind:dictate_lang";
 
 /**
- * Tap to start recording, tap again to stop & transcribe via Whisper-1.
- * Handles permissions, displays a pulsing red mic + timer while recording,
- * and shows a spinner during transcription.
+ * Streaming voice-input button (Google-Voice style).
+ *  - Tap once  -> start listening; words stream into the text box as you speak.
+ *  - Tap again -> stop. Long-press (or tap chip) -> language picker.
+ *  - Requires a development/production build (expo-speech-recognition native module).
  */
-export function MicButton({ onTranscribe, language, size = 44, style }: Props) {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const state = useAudioRecorderState(recorder, 250);
-
-  const [busy, setBusy] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+export function MicButton({
+  onFinal,
+  onInterim,
+  onListeningChange,
+  size = 44,
+  style,
+}: Props) {
+  const [lang, setLang] = useState<string>(DEFAULT_DICTATE_LANG);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const pulse = useRef(new Animated.Value(1)).current;
 
-  const isRecording = !!state?.isRecording;
-
-  // Pulse animation while recording
+  // Restore last-used language
   useEffect(() => {
-    if (isRecording) {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(LANG_STORAGE_KEY);
+        if (stored && findDictateLanguage(stored)) setLang(stored);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
+  const persistLang = useCallback(async (code: string) => {
+    setLang(code);
+    try {
+      await AsyncStorage.setItem(LANG_STORAGE_KEY, code);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const { listening, interim, error, supported, start, stop } =
+    useStreamingSpeechRecognition({
+      language: lang,
+      onFinal: (t) => onFinal(t),
+      onInterim: (t) => onInterim?.(t),
+      onEnd: () => onInterim?.(""),
+    });
+
+  // Pulse while listening
+  useEffect(() => {
+    onListeningChange?.(listening);
+    if (listening) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulse, { toValue: 1.25, duration: 600, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
-          Animated.timing(pulse, { toValue: 1.0,  duration: 600, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+          Animated.timing(pulse, {
+            toValue: 1.25,
+            duration: 600,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.ease),
+          }),
+          Animated.timing(pulse, {
+            toValue: 1.0,
+            duration: 600,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.ease),
+          }),
         ]),
       ).start();
     } else {
       pulse.stopAnimation();
       pulse.setValue(1);
     }
-  }, [isRecording, pulse]);
+  }, [listening, pulse, onListeningChange]);
 
-  // Elapsed-seconds counter
+  // Surface fatal errors in a one-shot alert
   useEffect(() => {
-    if (isRecording) {
-      setElapsed(0);
-      tickRef.current = setInterval(() => {
-        setElapsed((s) => {
-          if (s + 1 >= MAX_RECORD_SECONDS) {
-            stop().catch(() => undefined);
-          }
-          return s + 1;
-        });
-      }, 1000);
-    } else if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-    return () => {
-      if (tickRef.current) clearInterval(tickRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRecording]);
-
-  const ensurePermission = async (): Promise<boolean> => {
-    let perm = await getRecordingPermissionsAsync();
-    if (perm.status === "granted") return true;
-    if (perm.canAskAgain) {
-      perm = await requestRecordingPermissionsAsync();
-      if (perm.status === "granted") return true;
-    }
-    Alert.alert(
-      "Microphone access needed",
-      "KeyMind needs the microphone to dictate text. Enable it in Settings to continue.",
-      [
+    if (!error) return;
+    if (/permission|not-allowed|service-not-allowed/i.test(error)) {
+      Alert.alert("Microphone access needed", error, [
         { text: "Cancel", style: "cancel" },
         { text: "Open Settings", onPress: () => Linking.openSettings() },
-      ],
-    );
-    return false;
-  };
-
-  const start = async () => {
-    try {
-      const ok = await ensurePermission();
-      if (!ok) return;
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-        interruptionMode: "doNotMix",
-      });
-      await recorder.prepareToRecordAsync();
-      recorder.record();
-    } catch (e: any) {
-      console.warn("Recording start failed:", e?.message || e);
-      Alert.alert("Couldn't start recording", e?.message || "Try again.");
+      ]);
+    } else if (/preview build|isn't available/i.test(error)) {
+      Alert.alert("Build required", error, [{ text: "OK" }]);
+    } else if (!/no-speech|didn't hear/i.test(error)) {
+      // Silently ignore "no-speech" — common and noisy.
+      Alert.alert("Voice input", error);
     }
-  };
+  }, [error]);
 
-  const stop = async () => {
-    try {
-      await recorder.stop();
-      const uri = recorder.uri;
-      if (!uri) {
-        Alert.alert("Empty recording", "Didn't catch anything. Try again.");
-        return;
-      }
-      if (elapsed < 1) {
-        // Too short to send to Whisper
-        Alert.alert("Hold a bit longer", "Recording was too short. Try speaking for at least a second.");
-        return;
-      }
-      setBusy(true);
-      const res = await api.transcribe(uri, language);
-      const text = (res.text || "").trim();
-      if (!text) {
-        Alert.alert("Nothing heard", "We couldn't make out any speech. Try again in a quieter spot.");
-        return;
-      }
-      onTranscribe(text);
-    } catch (e: any) {
-      Alert.alert("Transcription failed", e?.detail || e?.message || "Please try again.");
-    } finally {
-      setBusy(false);
+  const toggle = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      Haptics.selectionAsync().catch(() => undefined);
     }
-  };
+    if (listening) {
+      await stop();
+    } else {
+      await start();
+    }
+  }, [listening, start, stop]);
 
-  const onPress = () => {
-    if (busy) return;
-    if (isRecording) stop();
-    else start();
-  };
-
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
-  const ss = String(elapsed % 60).padStart(2, "0");
+  const meta = findDictateLanguage(lang);
 
   return (
     <View style={[styles.wrap, style]} testID="mic-button-wrap">
-      {isRecording && (
-        <View style={styles.timerPill}>
-          <View style={styles.recDot} />
-          <Text style={styles.timerText}>{mm}:{ss}</Text>
-        </View>
-      )}
+      {/* Language chip — tap to change */}
+      <TouchableOpacity
+        onPress={() => setPickerOpen(true)}
+        style={styles.langChip}
+        activeOpacity={0.7}
+        testID="mic-lang-chip"
+        accessibilityLabel={`Voice input language: ${meta?.label ?? lang}`}
+      >
+        <Text style={styles.langChipText} numberOfLines={1}>
+          {meta?.flag ?? ""} {(meta?.code || lang).toUpperCase()}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Mic button */}
       <Animated.View style={{ transform: [{ scale: pulse }] }}>
         <TouchableOpacity
-          onPress={onPress}
+          onPress={toggle}
+          onLongPress={() => setPickerOpen(true)}
+          delayLongPress={350}
           activeOpacity={0.75}
-          disabled={busy}
           style={[
             styles.btn,
             {
-              width: size, height: size, borderRadius: size / 2,
-              backgroundColor: isRecording ? "#ff3b30" : COLORS.surface,
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              backgroundColor: listening ? "#ff3b30" : COLORS.surface,
             },
           ]}
           testID="mic-button"
-          accessibilityLabel={isRecording ? "Stop recording" : "Start voice input"}
+          accessibilityLabel={listening ? "Stop voice input" : "Start voice input"}
         >
-          {busy ? (
-            <ActivityIndicator color={isRecording ? COLORS.bg : COLORS.text} />
-          ) : (
-            <Ionicons
-              name={isRecording ? "square" : "mic"}
-              size={Math.round(size * 0.5)}
-              color={isRecording ? COLORS.bg : COLORS.text}
-            />
-          )}
+          <Ionicons
+            name={listening ? "square" : "mic"}
+            size={Math.round(size * 0.5)}
+            color={listening ? COLORS.bg : COLORS.text}
+          />
         </TouchableOpacity>
       </Animated.View>
+
+      {/* Live interim indicator (small dot + waveform-ish bars while we hear something) */}
+      {listening && (
+        <View style={styles.liveBadge} pointerEvents="none">
+          <View style={[styles.liveDot, !!interim && styles.liveDotActive]} />
+          <Text style={styles.liveText}>LIVE</Text>
+        </View>
+      )}
+
+      {/* Language picker modal */}
+      <Modal
+        visible={pickerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPickerOpen(false)}
+      >
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => setPickerOpen(false)}
+        >
+          <Pressable
+            style={styles.sheet}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Voice input language</Text>
+            <Text style={styles.sheetSubtitle}>
+              {supported
+                ? "Speak in this language — words appear in real time."
+                : "Native voice typing isn't available in this preview build."}
+            </Text>
+            <FlatList
+              data={DICTATE_LANGUAGES}
+              keyExtractor={(item) => item.code}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const selected = item.code === lang;
+                return (
+                  <TouchableOpacity
+                    style={[styles.langRow, selected && styles.langRowSel]}
+                    onPress={async () => {
+                      await persistLang(item.code);
+                      setPickerOpen(false);
+                    }}
+                  >
+                    <Text style={styles.langFlag}>{item.flag}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.langLabel}>{item.label}</Text>
+                      <Text style={styles.langNative} numberOfLines={1}>
+                        {item.nativeName} · {item.code}
+                      </Text>
+                    </View>
+                    {selected && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={22}
+                        color={COLORS.text}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: "row", alignItems: "center", gap: 8 },
+  wrap: { flexDirection: "row", alignItems: "center", gap: 6 },
+  langChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+    maxWidth: 78,
+  },
+  langChipText: {
+    fontSize: 10,
+    fontWeight: FONT.black,
+    color: COLORS.text,
+    letterSpacing: 0.5,
+  },
   btn: {
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    ...SHADOW.brutalSm,
   },
-  timerPill: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: COLORS.bg, borderWidth: 2, borderColor: COLORS.border,
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill,
+  liveBadge: {
+    position: "absolute",
+    top: -18,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ff3b30",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
   },
-  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#ff3b30" },
-  timerText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1 },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.6)",
+  },
+  liveDotActive: { backgroundColor: "#fff" },
+  liveText: {
+    fontSize: 9,
+    fontWeight: FONT.black,
+    color: "#fff",
+    letterSpacing: 1,
+  },
+
+  // Picker modal styles
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
+    maxHeight: "78%",
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: COLORS.border,
+    marginBottom: 12,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: FONT.black,
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  sheetSubtitle: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginBottom: 12,
+  },
+  langRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  langRowSel: { backgroundColor: COLORS.bg },
+  langFlag: { fontSize: 22 },
+  langLabel: {
+    fontSize: 15,
+    fontWeight: FONT.bold,
+    color: COLORS.text,
+  },
+  langNative: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
 });

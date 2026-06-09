@@ -33,9 +33,43 @@ export function WriteInputCard({
   onToast,
 }: Props) {
   const [ocrBusy, setOcrBusy] = React.useState(false);
+  const [interim, setInterim] = React.useState("");
+  const [listening, setListening] = React.useState(false);
+
+  // While listening we display: committed text + " " + interim (read-only feel).
+  const displayedText = React.useMemo(() => {
+    if (!interim) return text;
+    if (!text) return interim;
+    const needsSpace = !/\s$/.test(text);
+    return text + (needsSpace ? " " : "") + interim;
+  }, [text, interim]);
+
   const wordCount = React.useMemo(
-    () => (text.trim() ? text.trim().split(/\s+/).length : 0),
-    [text],
+    () =>
+      displayedText.trim()
+        ? displayedText.trim().split(/\s+/).length
+        : 0,
+    [displayedText],
+  );
+
+  const appendFinal = React.useCallback(
+    (spoken: string) => {
+      const clean = spoken.trim();
+      if (!clean) return;
+      const prev = text;
+      const merged = !prev
+        ? clean
+        : prev +
+          (/[.!?…\n]\s*$/.test(prev)
+            ? " "
+            : prev.endsWith(" ")
+            ? ""
+            : " ") +
+          clean;
+      onChangeText(merged);
+      onClearError?.();
+    },
+    [text, onChangeText, onClearError],
   );
 
   const copy = async (s: string) => {
@@ -97,30 +131,42 @@ export function WriteInputCard({
   return (
     <View style={styles.inputCard}>
       <TextInput
-        value={text}
+        value={displayedText}
         onChangeText={(v) => {
+          if (listening) {
+            // Ignore manual edits while voice is active; they would conflict
+            // with the incoming interim stream. Re-route as final-text update
+            // by stopping listening implicitly: just write to committed text
+            // if user is appending after the existing committed portion.
+            return;
+          }
           onChangeText(v);
           onClearError?.();
         }}
         multiline
+        editable={!listening}
         placeholder="Paste, type, or tap the mic to dictate…"
         placeholderTextColor={COLORS.textMuted}
-        style={[styles.input, { paddingRight: 52 }]}
+        style={[
+          styles.input,
+          { paddingRight: 52 },
+          listening && styles.inputListening,
+        ]}
         testID="writer-textinput"
       />
+      {listening && interim && (
+        <View style={styles.interimPill} pointerEvents="none">
+          <Text style={styles.interimText} numberOfLines={1}>
+            …{interim}
+          </Text>
+        </View>
+      )}
       <View style={styles.micFloater} pointerEvents="box-none">
         <MicButton
           size={40}
-          onTranscribe={(spoken) => {
-            const prev = text;
-            const merged = !prev
-              ? spoken
-              : prev +
-                (/[.!?…\n]\s*$/.test(prev) ? " " : prev.endsWith(" ") ? "" : " ") +
-                spoken;
-            onChangeText(merged);
-            onClearError?.();
-          }}
+          onFinal={appendFinal}
+          onInterim={setInterim}
+          onListeningChange={setListening}
         />
       </View>
       <View style={styles.inputFooter}>
@@ -186,6 +232,27 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   inputFooter: { marginTop: 12, gap: 10 },
+  inputListening: {
+    color: COLORS.textMuted,
+  },
+  interimPill: {
+    position: "absolute",
+    left: 14,
+    bottom: 64,
+    right: 14,
+    backgroundColor: "rgba(255,59,48,0.08)",
+    borderWidth: 1.5,
+    borderColor: "#ff3b30",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  interimText: {
+    fontSize: 13,
+    color: "#b91c1c",
+    fontWeight: FONT.bold,
+    fontStyle: "italic",
+  },
   actionRow: { flexDirection: "row", gap: 10, justifyContent: "flex-end" },
   iconBtn: {
     width: 40,

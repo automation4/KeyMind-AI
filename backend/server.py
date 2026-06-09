@@ -918,13 +918,16 @@ async def transcribe(
 
         stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
         # Whisper auto-detects language when `language` is None.
-        result = await stt.transcribe(
-            file=tmp_path,
-            model="whisper-1",
-            response_format="json",
-            language=language or None,
-            temperature=0.0,
-        )
+        # litellm expects `file` to be bytes / IOBase / PathLike — NOT a plain str,
+        # so we open the temp file as a binary handle.
+        with open(tmp_path, "rb") as fh:
+            result = await stt.transcribe(
+                file=fh,
+                model="whisper-1",
+                response_format="json",
+                language=language or None,
+                temperature=0.0,
+            )
         # `result` is a dict-like / LiteLLM TranscriptionResponse. Pull `.text`.
         text = ""
         if isinstance(result, dict):
