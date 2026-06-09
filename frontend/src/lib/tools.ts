@@ -43,6 +43,8 @@ export const TOOLS: ToolDef[] = [
   { id: "continue", label: "Continue", icon: "arrow-forward", description: "Continue writing naturally", accent: "lilac", multi: true },
   { id: "summarize", label: "Summarize", icon: "list", description: "Condense to key points", accent: "peach", multi: true },
   { id: "synonyms", label: "Synonyms", icon: "swap-horizontal", description: "Context-aware synonyms", accent: "mint", multi: true },
+  { id: "antonyms", label: "Antonyms", icon: "git-compare", description: "Opposite words for any term", accent: "peach", multi: true },
+  { id: "idioms", label: "Idioms", icon: "language-outline", description: "Real-life native-English sentences using the idiom", accent: "sky", multi: true },
   {
     id: "email",
     label: "Email Writer",

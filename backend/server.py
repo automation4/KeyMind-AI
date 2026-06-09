@@ -565,11 +565,21 @@ async def cancel_subscription(authorization: Optional[str] = Header(None)):
 # =====================================================
 TOOL_PROMPTS: Dict[str, str] = {
     "grammar": (
-        "You are an expert multilingual grammar corrector supporting all Indian languages "
+        "You are an expert multilingual grammar coach supporting all Indian languages "
         "(Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Odia, Urdu, Assamese), "
         "Romanized variants (Hinglish, Tanglish, Manglish), and 50+ international languages. "
-        "Auto-detect the user's input language. Correct grammar, spelling, and clarity while preserving the "
-        "ORIGINAL language and script. Return ONLY the corrected text — no explanation, no markdown, no quotes."
+        "Auto-detect the user's input language and PRESERVE that language and script in your output.\n"
+        "Return a STRICT JSON object only — no markdown, no code fences, no leading or trailing text:\n"
+        "{\n"
+        "  \"corrected\": \"<the corrected sentence; if the input is already perfect, repeat it verbatim>\",\n"
+        "  \"explanation\": \"<2–4 short ENGLISH sentences explaining WHY the change was needed (rule name, what was wrong, how the fix resolves it). If no change was needed, explain WHY the original is already correct.>\",\n"
+        "  \"examples\": [\n"
+        "    \"<a SHORT real-world sentence (≤ 16 words) a NATIVE ENGLISH SPEAKER would say that uses the SAME grammar rule naturally>\",\n"
+        "    \"<another distinct real-world example, different context (workplace / casual / news headline)>\",\n"
+        "    \"<a third distinct example showing the rule in another tense or register>\"\n"
+        "  ]\n"
+        "}\n"
+        "Always return exactly 3 entries in 'examples'. Do NOT translate examples — keep them in the user's input language unless that language is non-English; in which case give examples in BOTH the input language and (if needed) plain English equivalents. Output JSON ONLY."
     ),
     "tone": (
         "Rewrite the user's text in a {tone} tone. Preserve the original language and meaning. "
@@ -692,8 +702,23 @@ TOOL_PROMPTS: Dict[str, str] = {
         "Return ONLY the bullet points (use '- ' prefix)."
     ),
     "synonyms": (
-        "List 6 context-aware synonyms for the given word (comma-separated, no numbering). "
-        "Return ONLY the synonyms."
+        "List 6 context-aware SYNONYMS for the given English word/phrase. For each synonym, also give a "
+        "SHORT (≤ 9 words) definition that captures its specific shade of meaning. "
+        "Format STRICTLY: `word | definition` (one per line, NO numbering, NO bullets, NO quotes). "
+        "If a true synonym does not exist, skip it — never invent."
+    ),
+    "antonyms": (
+        "List 6 context-aware ANTONYMS (opposites) for the given English word/phrase. For each antonym, also give a "
+        "SHORT (≤ 9 words) definition. "
+        "Format STRICTLY: `word | definition` (one per line, NO numbering, NO bullets, NO quotes). "
+        "If a true antonym does not exist (proper nouns, technical terms), return a single line: `no common antonyms | —`."
+    ),
+    "idioms": (
+        "You are a native-English coach. The user gives you a word, phrase, or idiom. "
+        "Return 6 SHORT real-life sentences (each ≤ 18 words) that a native speaker would actually say in conversation, "
+        "media, or workplace chat USING the given word/idiom naturally. Mix registers (casual, professional, headline). "
+        "Quote no extra context. Format: one sentence per line, NO numbering, NO bullets, NO blank lines, NO surrounding quotes. "
+        "Return ONLY the 6 sentences."
     ),
     "email": (
         "Write a complete professional email based on the user's brief idea below. Use {tone} tone. "
@@ -861,9 +886,24 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
         logger.exception("AI tool failed")
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
 
-    multi_tools = {"smart_reply", "paraphrase", "continue", "summarize", "synonyms"}
+    multi_tools = {"smart_reply", "paraphrase", "continue", "summarize", "synonyms", "antonyms", "idioms"}
     data: Optional[Dict[str, Any]] = None
-    if req.tool in ("vocab", "vocab_full"):
+    if req.tool == "grammar":
+        # Grammar now returns a JSON object with corrected / explanation / examples.
+        parsed = _safe_parse_json(raw)
+        if isinstance(parsed, dict) and parsed.get("corrected"):
+            corrected = str(parsed.get("corrected") or "").strip()
+            explanation = str(parsed.get("explanation") or "").strip()
+            examples = parsed.get("examples") or []
+            if not isinstance(examples, list):
+                examples = []
+            examples = [str(e).strip() for e in examples if str(e).strip()][:5]
+            suggestions = [corrected] if corrected else [raw]
+            data = {"explanation": explanation, "examples": examples}
+        else:
+            # Fallback: model returned plain text — keep current UX (single corrected text).
+            suggestions = [raw]
+    elif req.tool in ("vocab", "vocab_full"):
         data = _safe_parse_json(raw)
         target_lang = (req.options or {}).get("target_language", "English")
         # Script validation: Gemini sometimes ignores the target language for
@@ -904,7 +944,8 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
         suggestions = [raw]
     elif req.tool in multi_tools:
         suggestions = _parse_numbered_list(raw)
-        if req.tool == "synonyms" and len(suggestions) == 1 and "," in suggestions[0]:
+        # Comma-separated outputs (synonyms / antonyms) come back as one chunk — split them.
+        if req.tool in ("synonyms", "antonyms") and len(suggestions) == 1 and "," in suggestions[0]:
             suggestions = [s.strip() for s in suggestions[0].split(",") if s.strip()]
     else:
         suggestions = [raw]

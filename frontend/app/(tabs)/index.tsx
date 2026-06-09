@@ -27,6 +27,7 @@ import { UpgradePrompt } from "@/src/components/UpgradePrompt";
 import { MicButton } from "@/src/components/MicButton";
 import { VocabLanguage, VOCAB_LANGUAGES } from "@/src/components/VocabCard";
 import { SimpleDescribeCard } from "@/src/components/SimpleDescribeCard";
+import { ListenButton } from "@/src/components/ListenButton";
 import { storage } from "@/src/utils/storage";
 
 const accentBg: Record<string, string> = {
@@ -435,35 +436,102 @@ export default function WriteScreen() {
                 }}
               />
             ) : (
-              result.suggestions.map((sug, idx) => (
-              <View key={idx} style={styles.resultCard}>
-                {result.tool === "grammar" && idx === 0 ? (
-                  <DiffView original={result.original} corrected={sug} />
-                ) : (
-                  <Text style={styles.resultText} selectable>
-                    {sug}
-                  </Text>
-                )}
-                <View style={styles.resultActions}>
-                  <TouchableOpacity
-                    style={styles.applyBtn}
-                    onPress={() => apply(sug)}
-                    testID={`apply-btn-${idx}`}
-                  >
-                    <Ionicons name="checkmark" size={16} color={COLORS.bg} />
-                    <Text style={styles.applyText}>APPLY</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.dismissBtn}
-                    onPress={() => copy(sug)}
-                    testID={`copy-btn-${idx}`}
-                  >
-                    <Ionicons name="copy-outline" size={14} color={COLORS.text} />
-                    <Text style={styles.dismissText}>COPY</Text>
-                  </TouchableOpacity>
+              <>
+              {result.suggestions.map((sug, idx) => {
+                // Synonyms/Antonyms come back as "word | short definition" — split for nicer rendering.
+                const isWordList = result.tool === "synonyms" || result.tool === "antonyms";
+                let wordPart = sug;
+                let meaningPart = "";
+                if (isWordList && sug.includes("|")) {
+                  const parts = sug.split("|");
+                  wordPart = (parts[0] || "").trim();
+                  meaningPart = parts.slice(1).join("|").trim();
+                }
+                return (
+                  <View key={idx} style={styles.resultCard}>
+                    {result.tool === "grammar" && idx === 0 ? (
+                      <DiffView original={result.original} corrected={sug} />
+                    ) : isWordList ? (
+                      <View style={styles.wordCardHeader}>
+                        <Text style={styles.wordCardWord} selectable>
+                          {wordPart}
+                        </Text>
+                        <ListenButton
+                          text={wordPart}
+                          small
+                          testID={`listen-word-${idx}`}
+                        />
+                      </View>
+                    ) : (
+                      <Text style={styles.resultText} selectable>
+                        {sug}
+                      </Text>
+                    )}
+                    {isWordList && meaningPart ? (
+                      <Text style={styles.wordCardMeaning} selectable>
+                        {meaningPart}
+                      </Text>
+                    ) : null}
+                    <View style={styles.resultActions}>
+                      <TouchableOpacity
+                        style={styles.applyBtn}
+                        onPress={() => apply(isWordList ? wordPart : sug)}
+                        testID={`apply-btn-${idx}`}
+                      >
+                        <Ionicons name="checkmark" size={16} color={COLORS.bg} />
+                        <Text style={styles.applyText}>APPLY</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.dismissBtn}
+                        onPress={() => copy(isWordList ? wordPart : sug)}
+                        testID={`copy-btn-${idx}`}
+                      >
+                        <Ionicons name="copy-outline" size={14} color={COLORS.text} />
+                        <Text style={styles.dismissText}>COPY</Text>
+                      </TouchableOpacity>
+                      {result.tool === "idioms" ? (
+                        <ListenButton text={sug} small testID={`listen-idiom-${idx}`} />
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+
+              {/* Grammar: WHY + native examples */}
+              {result.tool === "grammar" && result.data ? (
+                <View style={styles.grammarMetaCard}>
+                  {(result.data as any).explanation ? (
+                    <View style={{ gap: 6 }}>
+                      <Text style={styles.metaLabel}>WHY THIS CHANGE</Text>
+                      <Text style={styles.metaText} selectable>
+                        {(result.data as any).explanation}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {Array.isArray((result.data as any).examples) &&
+                  (result.data as any).examples.length > 0 ? (
+                    <View style={{ gap: 8, marginTop: 12 }}>
+                      <Text style={styles.metaLabel}>HOW NATIVE SPEAKERS USE IT</Text>
+                      {((result.data as any).examples as string[]).map(
+                        (ex, exIdx) => (
+                          <View key={exIdx} style={styles.exampleRow}>
+                            <Text style={styles.exampleText} selectable>
+                              {ex}
+                            </Text>
+                            <ListenButton
+                              text={ex}
+                              small
+                              compact
+                              testID={`listen-grammar-ex-${exIdx}`}
+                            />
+                          </View>
+                        ),
+                      )}
+                    </View>
+                  ) : null}
                 </View>
-              </View>
-              ))
+              ) : null}
+              </>
             )}
 
             <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
@@ -683,6 +751,71 @@ const styles = StyleSheet.create({
   },
   resultText: { fontSize: 15, lineHeight: 24, color: COLORS.text, paddingHorizontal: 2 },
   resultActions: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" },
+
+  // Synonym / Antonym word card: bold word + short meaning + LISTEN
+  wordCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  wordCardWord: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: FONT.black,
+    color: COLORS.text,
+    letterSpacing: -0.3,
+  },
+  wordCardMeaning: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: COLORS.textMuted,
+    fontWeight: FONT.bold,
+    marginTop: 8,
+  },
+
+  // Grammar: WHY + native examples block
+  grammarMetaCard: {
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.lilac,
+    gap: 6,
+    ...SHADOW.brutalSm,
+  },
+  metaLabel: {
+    fontSize: 10,
+    fontWeight: FONT.black,
+    letterSpacing: 1.5,
+    color: COLORS.textMuted,
+  },
+  metaText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLORS.text,
+    fontWeight: FONT.bold,
+  },
+  exampleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    backgroundColor: COLORS.surface,
+  },
+  exampleText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: COLORS.text,
+    fontWeight: FONT.bold,
+    fontStyle: "italic",
+  },
   applyBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.pill,

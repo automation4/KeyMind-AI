@@ -106,6 +106,8 @@ type Props = {
   onChangeLanguage: (lang: VocabLanguage) => void;
   loading?: boolean;
   onTrickyWordPress?: (word: string) => void;
+  /** When true, hide SYNONYMS and ANTONYMS sections (used by Chat — those tools live in Write tab). */
+  hideListSections?: boolean;
 };
 
 export function VocabCard({
@@ -114,6 +116,7 @@ export function VocabCard({
   onChangeLanguage,
   loading = false,
   onTrickyWordPress,
+  hideListSections = false,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -166,7 +169,7 @@ export function VocabCard({
       </View>
 
       {/* Synonyms */}
-      {data.synonyms && data.synonyms.length > 0 ? (
+      {!hideListSections && data.synonyms && data.synonyms.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>SYNONYMS</Text>
           <View style={styles.chipRow}>
@@ -185,7 +188,7 @@ export function VocabCard({
       ) : null}
 
       {/* Antonyms */}
-      {data.antonyms && data.antonyms.length > 0 ? (
+      {!hideListSections && data.antonyms && data.antonyms.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>ANTONYMS</Text>
           <View style={styles.chipRow}>
@@ -362,7 +365,7 @@ export function VocabCard({
                 <View style={styles.tenseBadge}>
                   <Text style={styles.tenseBadgeText}>{t.toUpperCase()}</Text>
                 </View>
-                <View style={{ flex: 1, gap: 6 }}>
+                <View style={{ gap: 6 }}>
                   {row.english ? (
                     <View style={styles.translatedLine}>
                       <Text style={styles.tenseEn} selectable>
@@ -565,17 +568,24 @@ const styles = StyleSheet.create({
   meaningNative: { flex: 1, minWidth: 0, fontSize: 16, color: COLORS.text, lineHeight: 24, fontWeight: FONT.bold },
 
   tenseRow: {
-    flexDirection: "row", gap: 10, alignItems: "flex-start",
-    paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.borderSoft,
+    flexDirection: "column",
+    gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderSoft,
   },
   tenseBadge: {
-    minWidth: 70, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
-    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.mint,
-    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.mint,
   },
   tenseBadgeText: { fontSize: 10, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1 },
-  tenseEn: { flex: 1, minWidth: 0, fontSize: 13, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 19 },
-  tenseNative: { flex: 1, minWidth: 0, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 21, opacity: 0.85 },
+  tenseEn: { flex: 1, minWidth: 0, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 20 },
+  tenseNative: { flex: 1, minWidth: 0, fontSize: 14, color: COLORS.text, fontWeight: FONT.bold, lineHeight: 22, opacity: 0.85 },
   tenseTranslit: { fontSize: 12, color: COLORS.textMuted, fontWeight: FONT.bold, lineHeight: 18, fontStyle: "italic" },
 
   idiomCard: {

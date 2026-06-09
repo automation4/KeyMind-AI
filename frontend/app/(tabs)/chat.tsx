@@ -225,6 +225,7 @@ export default function ChatScreen() {
                   <VocabCard
                     data={m.card}
                     language={m.cardLanguage || vocabLang}
+                    hideListSections
                     onChangeLanguage={async (lang) => {
                       setVocabLang(lang);
                       await storage.setItem(VOCAB_LANG_KEY, lang);

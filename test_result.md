@@ -109,7 +109,159 @@ user_problem_statement: |
   - Listen button on the relevant text fields so users can hear pronunciation.
 
 backend:
-  - task: "vocab tool: SLIM schema for Describe Write tab"
+  - task: "Synonyms / Antonyms — return word + short definition"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Prompt now asks for `word | short definition` (≤ 9 words) — one per line. Existing comma-split fallback still applies if model returns a single line. Verified manually for `resilient` and `replicate`."
+
+  - task: "Idioms tool — list real-life native English usage sentences"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "New tool id `idioms`. Returns 6 short native-speaker sentences (≤18 words) USING the input word/idiom across casual/professional/headline registers. Added to multi_tools dispatch."
+
+  - task: "Grammar tool — JSON with explanation + 3 native examples"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Prompt now outputs `{corrected, explanation, examples[3]}` JSON. Dispatch parses JSON and returns suggestions=[corrected] plus data={explanation, examples}. Graceful fallback if model returns plain text. Verified manually with `She dont knows the answer.`"
+
+frontend:
+  - task: "Write tab — Antonyms / Idioms tools added to picker"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/lib/tools.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added new tool definitions: `antonyms` (icon: git-compare, accent: peach) and `idioms` (icon: language-outline, accent: sky). Both are `multi: true`."
+
+  - task: "Write tab — Synonym / Antonym cards show meaning + LISTEN"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Suggestion cards for synonyms/antonyms now split each `word | meaning` into a bold word header (with LISTEN button) + a subtle definition below. APPLY/COPY use just the word. Idioms suggestions get a LISTEN button on the actions row."
+
+  - task: "Write tab — Grammar result shows WHY + native examples"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Below the DiffView card, a new lilac meta-card renders. Sections: 'WHY THIS CHANGE' (explanation paragraph), 'HOW NATIVE SPEAKERS USE IT' (3 example rows each with compact LISTEN). Hidden if result.tool != grammar or data is missing."
+
+  - task: "Chat — hide Synonyms / Antonyms in rich Describe card"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/VocabCard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "VocabCard now accepts `hideListSections` prop. Chat.tsx passes hideListSections to the embedded card so SYNONYMS and ANTONYMS sections do not render in Chat (they remain in the Write tab as dedicated tools). Write-tab VocabCard usage is unaffected (default false)."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.3"
+  test_sequence: 4
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Synonyms / Antonyms — return word + short definition"
+    - "Idioms tool — list real-life native English usage sentences"
+    - "Grammar tool — JSON with explanation + 3 native examples"
+    - "Write tab — Antonyms / Idioms tools added to picker"
+    - "Write tab — Synonym / Antonym cards show meaning + LISTEN"
+    - "Write tab — Grammar result shows WHY + native examples"
+    - "Chat — hide Synonyms / Antonyms in rich Describe card"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Validate the three new improvements:
+
+      BACKEND (use {EXPO_BACKEND_URL}/api/ai/tool):
+        B1. POST {"tool":"synonyms","text":"resilient"}
+            Expect data.suggestions = list of strings each containing " | " (word + meaning).
+        B2. POST {"tool":"antonyms","text":"resilient"} — same shape.
+        B3. POST {"tool":"idioms","text":"piece of cake"}
+            Expect suggestions = list of native-style English sentences containing the input phrase.
+        B4. POST {"tool":"grammar","text":"She dont knows the answer."}
+            Expect response 200; suggestions = [corrected sentence]; data = {explanation: non-empty,
+            examples: array length 3}. Each example should be a natural English sentence.
+        B5. POST {"tool":"grammar","text":"I went to the store yesterday."}
+            (Already correct.) Expect corrected ≈ input verbatim, explanation explains why it's already correct.
+
+      FRONTEND (http://localhost:3000):
+        F1. WRITE tab — Tool picker now includes new chips: "Antonyms" and "Idioms".
+        F2. Type "resilient", pick "Synonyms" → run.
+            • Each result card shows the synonym in bold (large), a LISTEN button on the right, and a
+              shorter grey definition below.
+            • APPLY / COPY at the bottom of each card.
+        F3. Type "resilient", pick "Antonyms" → run.
+            • Same structure as Synonyms; 6 antonyms with meanings.
+        F4. Type "piece of cake", pick "Idioms" → run.
+            • Each card shows a full real-life sentence + APPLY / COPY + a LISTEN button.
+        F5. Type "She dont knows the answer.", pick "Grammar" → run.
+            • First card: DiffView (original → corrected) + APPLY/COPY (existing UX).
+            • Below the card, a new lilac meta-card appears with two labelled sections:
+                ─ "WHY THIS CHANGE": explanation text
+                ─ "HOW NATIVE SPEAKERS USE IT": 3 example rows, each with the sentence + a compact circular LISTEN button
+        F6. CHAT tab — Tap "Describe indifference" quick prompt.
+            • Rich card appears. Confirm that "SYNONYMS" and "ANTONYMS" sections are NOT rendered
+              anywhere in the chat card (they were before — now hidden by `hideListSections`).
+            • All other sections (SIMPLE MEANING, WHEN SPEAKING, NATIVE SPEAKER WOULD SAY,
+              HOW TO REMEMBER, IN HINDI, USAGE IN TENSES, IDIOMS & PHRASES) must STILL appear.
+
+      Reference files:
+        - /app/backend/server.py (synonyms/antonyms/idioms/grammar prompts; dispatch around line 870–910)
+        - /app/frontend/src/lib/tools.ts (new entries)
+        - /app/frontend/app/(tabs)/index.tsx (suggestion render block ~435–540, styles ~750–820)
+        - /app/frontend/src/components/VocabCard.tsx (hideListSections prop, lines 103–120, 171–207)
+        - /app/frontend/app/(tabs)/chat.tsx (passes hideListSections)
+
+      Mocked APIs: None. Gemini 3 Flash + OpenAI TTS via Emergent LLM Key.
+      Credentials: guest path is fine. /app/memory/test_credentials.md.
+
+      Do not modify the JSON parsing in dispatch or the `word | meaning` split logic. Report findings with file+line.
     implemented: true
     working: true
     file: "/app/backend/server.py"
