@@ -3,31 +3,33 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Modal,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
-import { TOOLS, TOOL_BY_ID } from "@/src/lib/tools";
+import { TOOL_BY_ID } from "@/src/lib/tools";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useTheme } from "@/src/contexts/ThemeContext";
-import { DiffView } from "@/src/components/DiffView";
 import { AdBanner } from "@/src/components/AdBanner";
 import { UpgradePrompt } from "@/src/components/UpgradePrompt";
-import { MicButton } from "@/src/components/MicButton";
 import { VocabLanguage, VOCAB_LANGUAGES } from "@/src/components/VocabCard";
 import { SimpleDescribeCard } from "@/src/components/SimpleDescribeCard";
-import { ListenButton } from "@/src/components/ListenButton";
+import { WriteInputCard } from "@/src/components/write/WriteInputCard";
+import { ToolPickerSheet } from "@/src/components/write/ToolPickerSheet";
+import { ToolOptionsSheet } from "@/src/components/write/ToolOptionsSheet";
+import {
+  ResultSuggestion,
+  GrammarMetaCard,
+  ResultPayload,
+} from "@/src/components/write/ResultCard";
 import { storage } from "@/src/utils/storage";
 
 const accentBg: Record<string, string> = {
@@ -39,13 +41,6 @@ const accentBg: Record<string, string> = {
   lilac: COLORS.lilac,
 };
 
-type Result = {
-  tool: string;
-  original: string;
-  suggestions: string[];
-  data?: any;
-};
-
 const VOCAB_LANG_KEY = "keymind_vocab_lang";
 
 export default function WriteScreen() {
@@ -55,12 +50,11 @@ export default function WriteScreen() {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<Result | null>(null);
+  const [result, setResult] = useState<ResultPayload | null>(null);
   const [optionsOpen, setOptionsOpen] = useState<string | null>(null);
   const [appliedToast, setAppliedToast] = useState(false);
   const [pendingOptions, setPendingOptions] = useState<Record<string, string>>({});
   const [toolPickerOpen, setToolPickerOpen] = useState(false);
-  const [ocrBusy, setOcrBusy] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState<string | undefined>();
   const [vocabLang, setVocabLang] = useState<VocabLanguage>("Hindi");
@@ -78,7 +72,6 @@ export default function WriteScreen() {
         const langsRaw = await storage.getItem<string>("keymind_languages", "");
         if (langsRaw) {
           const list = JSON.parse(langsRaw) as string[];
-          // Prefer the first non-English language so the "second line" is genuinely a translation.
           const preferred =
             list.find(
               (l) =>
@@ -103,6 +96,11 @@ export default function WriteScreen() {
     [text],
   );
 
+  const showToast = () => {
+    setAppliedToast(true);
+    setTimeout(() => setAppliedToast(false), 1500);
+  };
+
   const runTool = async (toolId: string, options: Record<string, any> = {}) => {
     if (!text.trim()) {
       setError("Type something first ✍️");
@@ -115,7 +113,6 @@ export default function WriteScreen() {
       setUpgradeOpen(true);
       return;
     }
-    // Vocab tool auto-injects the target_language from user's preference.
     const finalOptions =
       toolId === "vocab" && !options.target_language
         ? { ...options, target_language: vocabLang }
@@ -165,11 +162,12 @@ export default function WriteScreen() {
   const apply = async (suggestion: string) => {
     setText(suggestion);
     setResult(null);
-    setAppliedToast(true);
+    showToast();
     if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
     }
-    setTimeout(() => setAppliedToast(false), 1500);
     if (user && activeTool) {
       try {
         await api.saveHistory(activeTool, result?.original || "", suggestion);
@@ -179,63 +177,10 @@ export default function WriteScreen() {
 
   const copy = async (s: string) => {
     await Clipboard.setStringAsync(s);
-    setAppliedToast(true);
-    setTimeout(() => setAppliedToast(false), 1200);
-  };
-
-  const handleUpload = async () => {
-    setError(null);
-    try {
-      // Permission (no-op on web)
-      if (Platform.OS !== "web") {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) {
-          setError("Photo library permission needed to upload an image.");
-          return;
-        }
-      }
-      const picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-        base64: true,
-      });
-      if (picked.canceled || !picked.assets?.length) return;
-      const asset = picked.assets[0];
-      let b64 = asset.base64;
-      if (!b64 && asset.uri) {
-        // Fallback fetch as data URL
-        const resp = await fetch(asset.uri);
-        const blob = await resp.blob();
-        b64 = await new Promise<string>((resolve) => {
-          const r = new FileReader();
-          r.onloadend = () => resolve(String(r.result).split(",")[1] || "");
-          r.readAsDataURL(blob);
-        });
-      }
-      if (!b64) {
-        setError("Could not read the selected image.");
-        return;
-      }
-      setOcrBusy(true);
-      const res = await api.ocr(b64);
-      if (!res.text) {
-        setError("No readable text found in the image.");
-        return;
-      }
-      setText((prev) => (prev ? prev.trimEnd() + "\n" + res.text : res.text));
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      }
-    } catch (e: any) {
-      setError(e?.message || "Image extraction failed");
-    } finally {
-      setOcrBusy(false);
-    }
+    showToast();
   };
 
   const dismiss = () => setResult(null);
-
   const retry = () => {
     if (activeTool) runTool(activeTool, pendingOptions);
   };
@@ -245,7 +190,9 @@ export default function WriteScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.eyebrow}>HELLO, {(user?.name || "WRITER").toUpperCase()}</Text>
+          <Text style={styles.eyebrow}>
+            HELLO, {(user?.name || "WRITER").toUpperCase()}
+          </Text>
           <Text style={styles.title}>What are{"\n"}we writing?</Text>
         </View>
         <View style={[styles.avatar, { backgroundColor: accentColor }]}>
@@ -260,10 +207,8 @@ export default function WriteScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Ad banner (free-tier only) */}
         <AdBanner placement="top" />
 
-        {/* Free-tier usage chip */}
         {!isPremium && (
           <View style={styles.usageChip} testID="write-usage-chip">
             <Ionicons name="flash-outline" size={14} color={COLORS.text} />
@@ -274,70 +219,14 @@ export default function WriteScreen() {
           </View>
         )}
 
-        {/* Text input card */}
-        <View style={styles.inputCard}>
-          <TextInput
-            value={text}
-            onChangeText={(v) => {
-              setText(v);
-              if (error) setError(null);
-            }}
-            multiline
-            placeholder="Paste, type, or tap the mic to dictate…"
-            placeholderTextColor={COLORS.textMuted}
-            style={[styles.input, { paddingRight: 52 }]}
-            testID="writer-textinput"
-          />
-          <View style={styles.micFloater} pointerEvents="box-none">
-            <MicButton
-              size={40}
-              onTranscribe={(spoken) => {
-                setText((prev) => {
-                  if (!prev) return spoken;
-                  const sep = /[.!?…\n]\s*$/.test(prev) ? " " : prev.endsWith(" ") ? "" : " ";
-                  return prev + sep + spoken;
-                });
-                if (error) setError(null);
-              }}
-            />
-          </View>
-          <View style={styles.inputFooter}>
-            <Text style={styles.meta}>{wordCount} WORDS</Text>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                onPress={handleUpload}
-                disabled={ocrBusy}
-                style={[styles.iconBtn, { backgroundColor: COLORS.mint }]}
-                testID="upload-image-btn"
-                accessibilityLabel={ocrBusy ? "Reading image" : "Upload image"}
-              >
-                {ocrBusy ? (
-                  <ActivityIndicator size="small" color={COLORS.text} />
-                ) : (
-                  <Ionicons name="image-outline" size={20} color={COLORS.text} />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => copy(text)}
-                disabled={!text}
-                style={styles.iconBtn}
-                testID="copy-input-btn"
-                accessibilityLabel="Copy text"
-              >
-                <Ionicons name="copy-outline" size={20} color={COLORS.text} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setText("")}
-                disabled={!text}
-                style={styles.iconBtn}
-                testID="clear-input-btn"
-                accessibilityLabel="Clear text"
-              >
-                <Ionicons name="close" size={22} color={COLORS.text} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        {/* Input card (text, mic, upload/copy/clear) */}
+        <WriteInputCard
+          text={text}
+          onChangeText={setText}
+          onError={setError}
+          onClearError={() => setError(null)}
+          onToast={showToast}
+        />
 
         {error ? (
           <Text style={styles.error} testID="writer-error">
@@ -365,7 +254,11 @@ export default function WriteScreen() {
               ]}
             >
               <Ionicons
-                name={activeTool ? TOOL_BY_ID[activeTool]?.icon ?? "sparkles" : "sparkles"}
+                name={
+                  activeTool
+                    ? TOOL_BY_ID[activeTool]?.icon ?? "sparkles"
+                    : "sparkles"
+                }
                 size={20}
                 color={COLORS.text}
               />
@@ -390,10 +283,12 @@ export default function WriteScreen() {
 
         {/* Result */}
         {loading && !result && (
-          <View style={styles.resultCard}>
+          <View style={styles.thinkingCard}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <ActivityIndicator color={COLORS.text} />
-              <Text style={styles.thinking}>Thinking in {wordCount > 30 ? "any language" : "your language"}…</Text>
+              <Text style={styles.thinking}>
+                Thinking in {wordCount > 30 ? "any language" : "your language"}…
+              </Text>
             </View>
           </View>
         )}
@@ -414,7 +309,9 @@ export default function WriteScreen() {
                   if (!text.trim() || vocabReloading) return;
                   setVocabReloading(true);
                   try {
-                    const data = await api.tool("vocab", result.original, { target_language: lang });
+                    const data = await api.tool("vocab", result.original, {
+                      target_language: lang,
+                    });
                     setResult({
                       tool: "vocab",
                       original: result.original,
@@ -424,11 +321,15 @@ export default function WriteScreen() {
                     refreshUser();
                   } catch (e: any) {
                     if (e?.status === 429) {
-                      setUpgradeMessage(e?.detail || "Daily limit reached. Try again tomorrow.");
+                      setUpgradeMessage(
+                        e?.detail || "Daily limit reached. Try again tomorrow.",
+                      );
                       setUpgradeOpen(true);
                       refreshUser();
                     } else {
-                      setError(e?.detail || e?.message || "Could not translate. Try again.");
+                      setError(
+                        e?.detail || e?.message || "Could not translate. Try again.",
+                      );
                     }
                   } finally {
                     setVocabReloading(false);
@@ -437,109 +338,36 @@ export default function WriteScreen() {
               />
             ) : (
               <>
-              {result.suggestions.map((sug, idx) => {
-                // Synonyms/Antonyms come back as "word | short definition" — split for nicer rendering.
-                const isWordList = result.tool === "synonyms" || result.tool === "antonyms";
-                let wordPart = sug;
-                let meaningPart = "";
-                if (isWordList && sug.includes("|")) {
-                  const parts = sug.split("|");
-                  wordPart = (parts[0] || "").trim();
-                  meaningPart = parts.slice(1).join("|").trim();
-                }
-                return (
-                  <View key={idx} style={styles.resultCard}>
-                    {result.tool === "grammar" && idx === 0 ? (
-                      <DiffView original={result.original} corrected={sug} />
-                    ) : isWordList ? (
-                      <View style={styles.wordCardHeader}>
-                        <Text style={styles.wordCardWord} selectable>
-                          {wordPart}
-                        </Text>
-                        <ListenButton
-                          text={wordPart}
-                          small
-                          testID={`listen-word-${idx}`}
-                        />
-                      </View>
-                    ) : (
-                      <Text style={styles.resultText} selectable>
-                        {sug}
-                      </Text>
-                    )}
-                    {isWordList && meaningPart ? (
-                      <Text style={styles.wordCardMeaning} selectable>
-                        {meaningPart}
-                      </Text>
-                    ) : null}
-                    <View style={styles.resultActions}>
-                      <TouchableOpacity
-                        style={styles.applyBtn}
-                        onPress={() => apply(isWordList ? wordPart : sug)}
-                        testID={`apply-btn-${idx}`}
-                      >
-                        <Ionicons name="checkmark" size={16} color={COLORS.bg} />
-                        <Text style={styles.applyText}>APPLY</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.dismissBtn}
-                        onPress={() => copy(isWordList ? wordPart : sug)}
-                        testID={`copy-btn-${idx}`}
-                      >
-                        <Ionicons name="copy-outline" size={14} color={COLORS.text} />
-                        <Text style={styles.dismissText}>COPY</Text>
-                      </TouchableOpacity>
-                      {result.tool === "idioms" ? (
-                        <ListenButton text={sug} small testID={`listen-idiom-${idx}`} />
-                      ) : null}
-                    </View>
-                  </View>
-                );
-              })}
-
-              {/* Grammar: WHY + native examples */}
-              {result.tool === "grammar" && result.data ? (
-                <View style={styles.grammarMetaCard}>
-                  {(result.data as any).explanation ? (
-                    <View style={{ gap: 6 }}>
-                      <Text style={styles.metaLabel}>WHY THIS CHANGE</Text>
-                      <Text style={styles.metaText} selectable>
-                        {(result.data as any).explanation}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {Array.isArray((result.data as any).examples) &&
-                  (result.data as any).examples.length > 0 ? (
-                    <View style={{ gap: 8, marginTop: 12 }}>
-                      <Text style={styles.metaLabel}>HOW NATIVE SPEAKERS USE IT</Text>
-                      {((result.data as any).examples as string[]).map(
-                        (ex, exIdx) => (
-                          <View key={exIdx} style={styles.exampleRow}>
-                            <Text style={styles.exampleText} selectable>
-                              {ex}
-                            </Text>
-                            <ListenButton
-                              text={ex}
-                              small
-                              compact
-                              testID={`listen-grammar-ex-${exIdx}`}
-                            />
-                          </View>
-                        ),
-                      )}
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
+                {result.suggestions.map((sug, idx) => (
+                  <ResultSuggestion
+                    key={idx}
+                    result={result}
+                    index={idx}
+                    suggestion={sug}
+                    onApply={apply}
+                    onCopy={copy}
+                  />
+                ))}
+                {result.tool === "grammar" && result.data ? (
+                  <GrammarMetaCard data={result.data} />
+                ) : null}
               </>
             )}
 
             <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-              <TouchableOpacity style={styles.ghostBtn} onPress={retry} testID="retry-btn">
+              <TouchableOpacity
+                style={styles.ghostBtn}
+                onPress={retry}
+                testID="retry-btn"
+              >
                 <Ionicons name="refresh" size={14} color={COLORS.text} />
                 <Text style={styles.ghostBtnText}>RETRY</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.ghostBtn} onPress={dismiss} testID="dismiss-btn">
+              <TouchableOpacity
+                style={styles.ghostBtn}
+                onPress={dismiss}
+                testID="dismiss-btn"
+              >
                 <Ionicons name="close" size={14} color={COLORS.text} />
                 <Text style={styles.ghostBtnText}>DISMISS</Text>
               </TouchableOpacity>
@@ -548,106 +376,26 @@ export default function WriteScreen() {
         )}
       </ScrollView>
 
-      {/* Tool picker dropdown modal */}
-      <Modal
+      <ToolPickerSheet
         visible={toolPickerOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setToolPickerOpen(false)}
-      >
-        <View style={styles.modalBg}>
-          <View style={[styles.sheet, { maxHeight: "80%" }]}>
-            <View style={styles.sheetHandle} />
-            <Text style={[styles.section, { marginTop: 4 }]}>SELECT A TOOL</Text>
-            <ScrollView style={{ marginTop: 8 }} showsVerticalScrollIndicator={false}>
-              {TOOLS.map((t) => {
-                const selected = activeTool === t.id;
-                return (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={[styles.toolRow, selected && styles.toolRowActive]}
-                    onPress={() => {
-                      setToolPickerOpen(false);
-                      onPressTool(t.id);
-                    }}
-                    testID={`tool-${t.id}`}
-                  >
-                    <View style={[styles.toolRowIcon, { backgroundColor: accentBg[t.accent] }]}>
-                      <Ionicons name={t.icon} size={18} color={COLORS.text} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.toolRowLabel}>{t.label}</Text>
-                      <Text style={styles.toolRowSub} numberOfLines={1}>
-                        {t.description}
-                      </Text>
-                    </View>
-                    {selected && <Ionicons name="checkmark" size={20} color={COLORS.text} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity
-              style={[
-                styles.sheetBtn,
-                { backgroundColor: COLORS.surface, marginTop: 12, flex: 0 },
-              ]}
-              onPress={() => setToolPickerOpen(false)}
-              testID="tool-picker-close-btn"
-            >
-              <Text style={[styles.sheetBtnText, { color: COLORS.text }]}>CLOSE</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        activeTool={activeTool}
+        onClose={() => setToolPickerOpen(false)}
+        onSelect={onPressTool}
+      />
 
-      {/* Options modal */}
-      <Modal visible={!!optionsOpen} transparent animationType="slide" onRequestClose={() => setOptionsOpen(null)}>
-        <View style={styles.modalBg}>
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            {optionsOpen && TOOL_BY_ID[optionsOpen]?.options?.map((opt) => (
-              <View key={opt.key} style={{ marginBottom: 16 }}>
-                <Text style={styles.section}>{opt.label.toUpperCase()}</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {opt.choices.map((c) => {
-                    const active = pendingOptions[opt.key] === c;
-                    return (
-                      <TouchableOpacity
-                        key={c}
-                        onPress={() => setPendingOptions((p) => ({ ...p, [opt.key]: c }))}
-                        style={[styles.optChip, active && styles.optChipActive]}
-                        testID={`opt-${opt.key}-${c.toLowerCase()}`}
-                      >
-                        <Text style={[styles.optChipText, active && styles.optChipTextActive]}>{c}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-              <TouchableOpacity
-                style={[styles.sheetBtn, { backgroundColor: COLORS.surface }]}
-                onPress={() => setOptionsOpen(null)}
-                testID="opt-cancel-btn"
-              >
-                <Text style={[styles.sheetBtnText, { color: COLORS.text }]}>CANCEL</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.sheetBtn, { backgroundColor: COLORS.text, flex: 2 }]}
-                onPress={() => {
-                  const tool = optionsOpen;
-                  setOptionsOpen(null);
-                  if (tool) runTool(tool, pendingOptions);
-                }}
-                testID="opt-run-btn"
-              >
-                <Text style={[styles.sheetBtnText, { color: COLORS.bg }]}>RUN</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ToolOptionsSheet
+        toolId={optionsOpen}
+        pendingOptions={pendingOptions}
+        onChangeOption={(key, value) =>
+          setPendingOptions((p) => ({ ...p, [key]: value }))
+        }
+        onCancel={() => setOptionsOpen(null)}
+        onRun={() => {
+          const tool = optionsOpen;
+          setOptionsOpen(null);
+          if (tool) runTool(tool, pendingOptions);
+        }}
+      />
 
       {appliedToast && (
         <View style={styles.toast} testID="applied-toast">
@@ -668,211 +416,153 @@ export default function WriteScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg, paddingHorizontal: 20 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", paddingTop: 8, paddingBottom: 16 },
-  eyebrow: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
-  title: { fontSize: 32, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -1.2, lineHeight: 34 },
-  avatar: {
-    width: 48, height: 48, borderRadius: 14, borderWidth: 2, borderColor: COLORS.border,
-    alignItems: "center", justifyContent: "center", ...SHADOW.brutalSm,
-  },
-  avatarText: { fontSize: 18, fontWeight: FONT.black, color: COLORS.text },
-
-  inputCard: {
-    backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border,
-    borderRadius: RADIUS.lg, paddingHorizontal: 20, paddingVertical: 18, ...SHADOW.brutal,
-    position: "relative",
-  },
-  micFloater: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-  },
-  input: {
-    minHeight: 140,
-    fontSize: 16,
-    lineHeight: 24,
-    color: COLORS.text,
-    fontWeight: FONT.regular,
-    textAlignVertical: "top",
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  inputFooter: { marginTop: 12, gap: 10 },
-  actionRow: { flexDirection: "row", gap: 10, justifyContent: "flex-end" },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: RADIUS.md,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-  },
-  meta: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
-
-  section: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text, marginTop: 24, marginBottom: 12 },
-  dropdown: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border,
-    borderRadius: RADIUS.lg, paddingHorizontal: 14, paddingVertical: 14, gap: 12, ...SHADOW.brutalSm,
-  },
-  dropdownLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
-  dropdownIcon: {
-    width: 40, height: 40, borderRadius: 12,
-    borderWidth: 2, borderColor: COLORS.border,
-    alignItems: "center", justifyContent: "center",
-  },
-  dropdownLabel: { fontSize: 15, fontWeight: FONT.black, color: COLORS.text },
-  dropdownSub: { marginTop: 2, fontSize: 12, color: COLORS.textMuted, fontWeight: FONT.regular },
-  toolRow: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingVertical: 10, paddingHorizontal: 4,
-    borderBottomWidth: 1, borderColor: COLORS.borderSoft,
-  },
-  toolRowActive: { backgroundColor: COLORS.bg },
-  toolRowIcon: {
-    width: 36, height: 36, borderRadius: 10,
-    borderWidth: 2, borderColor: COLORS.border,
-    alignItems: "center", justifyContent: "center",
-  },
-  toolRowLabel: { fontSize: 14, fontWeight: FONT.black, color: COLORS.text },
-  toolRowSub: { marginTop: 2, fontSize: 11, color: COLORS.textMuted, fontWeight: FONT.regular },
-  toolsRow: { paddingRight: 24, gap: 8 },
-  toolChip: {
-    height: 80, width: 92, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.border,
-    alignItems: "center", justifyContent: "center", padding: 8, gap: 6, flexShrink: 0, ...SHADOW.brutalSm,
-  },
-  toolLabel: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, textAlign: "center", letterSpacing: 0.5 },
-
-  resultCard: {
-    backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border,
-    borderRadius: RADIUS.lg, paddingHorizontal: 20, paddingVertical: 18, marginBottom: 10, ...SHADOW.brutal,
-  },
-  resultText: { fontSize: 15, lineHeight: 24, color: COLORS.text, paddingHorizontal: 2 },
-  resultActions: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" },
-
-  // Synonym / Antonym word card: bold word + short meaning + LISTEN
-  wordCardHeader: {
+  header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    alignItems: "flex-end",
+    paddingTop: 8,
+    paddingBottom: 16,
   },
-  wordCardWord: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: FONT.black,
-    color: COLORS.text,
-    letterSpacing: -0.3,
-  },
-  wordCardMeaning: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: COLORS.textMuted,
-    fontWeight: FONT.bold,
-    marginTop: 8,
-  },
-
-  // Grammar: WHY + native examples block
-  grammarMetaCard: {
-    marginBottom: 12,
-    padding: 14,
-    borderRadius: RADIUS.lg,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.lilac,
-    gap: 6,
-    ...SHADOW.brutalSm,
-  },
-  metaLabel: {
-    fontSize: 10,
+  eyebrow: {
+    fontSize: 11,
     fontWeight: FONT.black,
     letterSpacing: 1.5,
     color: COLORS.textMuted,
   },
-  metaText: {
-    fontSize: 14,
-    lineHeight: 21,
+  title: {
+    fontSize: 32,
+    fontWeight: FONT.black,
     color: COLORS.text,
-    fontWeight: FONT.bold,
+    letterSpacing: -1.2,
+    lineHeight: 34,
   },
-  exampleRow: {
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
+    ...SHADOW.brutalSm,
+  },
+  avatarText: { fontSize: 18, fontWeight: FONT.black, color: COLORS.text },
+  section: {
+    fontSize: 11,
+    fontWeight: FONT.black,
+    letterSpacing: 1.5,
+    color: COLORS.text,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  dropdown: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.borderSoft,
+    justifyContent: "space-between",
     backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 12,
+    ...SHADOW.brutalSm,
   },
-  exampleText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 19,
-    color: COLORS.text,
-    fontWeight: FONT.bold,
-    fontStyle: "italic",
+  dropdownLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+  dropdownIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  applyBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.text, borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
+  dropdownLabel: { fontSize: 15, fontWeight: FONT.black, color: COLORS.text },
+  dropdownSub: {
+    marginTop: 2,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: FONT.regular,
   },
-  applyText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.bg, letterSpacing: 1 },
-  dismissBtn: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.bg, borderWidth: 2, borderColor: COLORS.border,
+  thinkingCard: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    marginTop: 12,
+    ...SHADOW.brutal,
   },
-  dismissText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.5 },
-  ghostBtn: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: RADIUS.pill,
-    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.bg,
-  },
-  ghostBtnText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.5 },
   thinking: { fontSize: 13, color: COLORS.text, fontWeight: FONT.bold },
-  error: { marginTop: 12, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13 },
-
-  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: COLORS.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    borderTopWidth: 3, borderColor: COLORS.border, padding: 20, paddingBottom: 36,
-  },
-  sheetHandle: { alignSelf: "center", width: 56, height: 5, borderRadius: 3, backgroundColor: COLORS.text, marginBottom: 8 },
-  optChip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.pill,
-    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.bg,
-  },
-  optChipActive: { backgroundColor: COLORS.text },
-  optChipText: { fontSize: 13, fontWeight: FONT.bold, color: COLORS.text },
-  optChipTextActive: { color: COLORS.bg },
-  sheetBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: RADIUS.lg,
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
-  },
-  sheetBtnText: { fontSize: 13, fontWeight: FONT.black, letterSpacing: 1.5 },
-
-  toast: {
-    position: "absolute", bottom: 24, alignSelf: "center",
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: COLORS.text, paddingHorizontal: 16, paddingVertical: 12, borderRadius: RADIUS.pill,
-    borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
-  },
-  toastText: { color: COLORS.bg, fontWeight: FONT.black, fontSize: 13, letterSpacing: 1 },
-  usageChip: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 10, paddingVertical: 6,
+  ghostBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: RADIUS.pill,
-    borderWidth: 2, borderColor: COLORS.border,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+  },
+  ghostBtnText: {
+    fontSize: 11,
+    fontWeight: FONT.black,
+    color: COLORS.text,
+    letterSpacing: 0.5,
+  },
+  error: {
+    marginTop: 12,
+    color: "#B91C1C",
+    fontWeight: FONT.bold,
+    fontSize: 13,
+  },
+  toast: {
+    position: "absolute",
+    bottom: 24,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.text,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: RADIUS.pill,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    ...SHADOW.brutalSm,
+  },
+  toastText: {
+    color: COLORS.bg,
+    fontWeight: FONT.black,
+    fontSize: 13,
+    letterSpacing: 1,
+  },
+  usageChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    borderWidth: 2,
+    borderColor: COLORS.border,
     backgroundColor: COLORS.peach,
     marginBottom: 10,
   },
-  usageChipText: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.5 },
-  usageChipSub: { fontSize: 10, fontWeight: FONT.bold, color: COLORS.text, opacity: 0.6 },
+  usageChipText: {
+    fontSize: 11,
+    fontWeight: FONT.black,
+    color: COLORS.text,
+    letterSpacing: 0.5,
+  },
+  usageChipSub: {
+    fontSize: 10,
+    fontWeight: FONT.bold,
+    color: COLORS.text,
+    opacity: 0.6,
+  },
 });
