@@ -160,13 +160,6 @@ export function WriteInputCard({
         ]}
         testID="writer-textinput"
       />
-      {listening && interim && (
-        <View style={styles.interimPill} pointerEvents="none">
-          <Text style={styles.interimText} numberOfLines={1}>
-            …{interim}
-          </Text>
-        </View>
-      )}
       <View style={styles.micFloater} pointerEvents="box-none">
         <MicButton
           size={40}
@@ -246,25 +239,7 @@ const styles = StyleSheet.create({
   },
   inputFooter: { marginTop: 12, gap: 10 },
   inputListening: {
-    color: COLORS.textMuted,
-  },
-  interimPill: {
-    position: "absolute",
-    left: 14,
-    bottom: 64,
-    right: 14,
-    backgroundColor: "rgba(255,59,48,0.08)",
-    borderWidth: 1.5,
-    borderColor: "#ff3b30",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  interimText: {
-    fontSize: 13,
-    color: "#b91c1c",
-    fontWeight: FONT.bold,
-    fontStyle: "italic",
+    color: COLORS.text,
   },
   actionRow: { flexDirection: "row", gap: 10, justifyContent: "flex-end" },
   iconBtn: {

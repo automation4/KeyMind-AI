@@ -70,35 +70,61 @@ export function useStreamingSpeechRecognition(
 
   const supported = !!ESR && !!useSREvent;
 
+  // Track which final results we've already emitted to avoid duplicates.
+  // Reset on every new start() call AND whenever the results array shrinks
+  // (which indicates the native engine restarted mid-session on Android).
+  const emittedFinalCountRef = useRef(0);
+  const lastResultsLenRef = useRef(0);
+
   // Subscribe to native/web speech events (no-op if module missing).
   if (useSREvent) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useSREvent("result", (event: any) => {
       try {
-        const idx: number = event?.resultIndex ?? 0;
         const results = event?.results ?? [];
-        const r = results[idx];
-        if (!r) return;
+        if (!results.length) return;
 
-        // event.results[idx] is array-like of alternatives OR object with `transcript`.
-        const alt = Array.isArray(r) ? r[0] : r[0] ?? r;
-        const transcript: string =
-          (alt && (alt.transcript || alt[0]?.transcript)) ||
-          (typeof r?.transcript === "string" ? r.transcript : "") ||
-          "";
-        // expo-speech-recognition fires "result" events where `event.isFinal`
-        // sits on the event itself OR on the SpeechRecognitionResult.
-        const isFinal: boolean = !!(event?.isFinal ?? r?.isFinal);
-
-        if (!transcript) return;
-
-        if (isFinal) {
-          setInterim("");
-          onFinalRef.current?.(transcript);
-        } else {
-          setInterim(transcript);
-          onInterimRef.current?.(transcript);
+        // Safety: if the array shrunk vs. last event, the native engine
+        // restarted mid-session (Android). Reset our dedup counter.
+        if (results.length < lastResultsLenRef.current) {
+          emittedFinalCountRef.current = 0;
         }
+        lastResultsLenRef.current = results.length;
+
+        // Walk every result. Each result has `isFinal` and an array of
+        // alternatives (best at index 0). We emit each *new* final result
+        // exactly once (using emittedFinalCountRef) and recompute the
+        // current interim from any non-final tail.
+        let finalsSeen = 0;
+        let interimText = "";
+
+        for (let i = 0; i < results.length; i++) {
+          const r = results[i];
+          if (!r) continue;
+          const alt = Array.isArray(r) ? r[0] : r[0] ?? r;
+          const transcript: string =
+            (alt && (alt.transcript || alt[0]?.transcript)) ||
+            (typeof r?.transcript === "string" ? r.transcript : "") ||
+            "";
+          const isFinal: boolean = !!(r?.isFinal ?? event?.isFinal);
+
+          if (isFinal) {
+            finalsSeen += 1;
+            // Only emit if we haven't already emitted this index.
+            if (finalsSeen > emittedFinalCountRef.current && transcript) {
+              emittedFinalCountRef.current = finalsSeen;
+              onFinalRef.current?.(transcript);
+            }
+          } else if (transcript) {
+            interimText = interimText
+              ? `${interimText} ${transcript}`
+              : transcript;
+          }
+        }
+
+        // Always update interim (may become empty when an utterance finalizes).
+        setInterim(interimText);
+        if (interimText) onInterimRef.current?.(interimText);
       } catch (e) {
         // swallow — don't crash on weird event payloads
       }
@@ -152,6 +178,8 @@ export function useStreamingSpeechRecognition(
   const start = useCallback(async () => {
     setError(null);
     setInterim("");
+    emittedFinalCountRef.current = 0;
+    lastResultsLenRef.current = 0;
     if (!ESR) {
       setError(
         "Voice typing isn't available in this preview build. Publish & install the app to use streaming dictation.",
