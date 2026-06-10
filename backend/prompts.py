@@ -375,4 +375,67 @@ __all__ = [
     "format_prompt",
     "text_matches_script",
     "vocab_payload_valid",
+    "build_chat_response_language_directive",
 ]
+
+
+# =====================================================
+# Chat response-language directive
+# =====================================================
+# Each entry maps a frontend `response_language` code → an instruction block
+# that gets appended to CHAT_SYSTEM_MESSAGE. "auto" / "" → no override.
+_CHAT_RESPONSE_LANG_RULES: Dict[str, Dict[str, str]] = {
+    "english":      {"label": "English",                "script": "Latin (English alphabet)",                     "sample": "Hello, how are you?"},
+    "hindi":        {"label": "Hindi",                  "script": "Devanagari (हिंदी)",                              "sample": "नमस्ते, आप कैसे हैं?"},
+    "hinglish":     {"label": "Hinglish",               "script": "Roman / Latin alphabet (Hindi written in English letters — NEVER Devanagari)", "sample": "Namaste, aap kaise hain?"},
+    "konkani-deva": {"label": "Konkani (Goan / IAST)",  "script": "Devanagari (कोंकणी)",                           "sample": "नमस्कार, तुं कसो आसा?"},
+    "konkani-romi": {"label": "Konkani (Romi / Goan)",  "script": "Roman / Latin alphabet (Konkani written in English letters — NEVER Devanagari)", "sample": "Namaskar, tum koso asa?"},
+    "marathi":      {"label": "Marathi",                "script": "Devanagari (मराठी)",                              "sample": "नमस्कार, तुम्ही कसे आहात?"},
+    "tamil":        {"label": "Tamil",                  "script": "Tamil script (தமிழ்) — NEVER Devanagari",        "sample": "வணக்கம், எப்படி இருக்கீங்க?"},
+    "telugu":       {"label": "Telugu",                 "script": "Telugu script (తెలుగు) — NEVER Devanagari",      "sample": "నమస్తే, మీరు ఎలా ఉన్నారు?"},
+    "kannada":      {"label": "Kannada",                "script": "Kannada script (ಕನ್ನಡ) — NEVER Devanagari",      "sample": "ನಮಸ್ಕಾರ, ಹೇಗಿದ್ದೀರಾ?"},
+    "malayalam":    {"label": "Malayalam",              "script": "Malayalam script (മലയാളം) — NEVER Devanagari",  "sample": "നമസ്കാരം, സുഖമാണോ?"},
+    "bengali":      {"label": "Bengali",                "script": "Bengali script (বাংলা)",                          "sample": "নমস্কার, কেমন আছেন?"},
+    "gujarati":     {"label": "Gujarati",               "script": "Gujarati script (ગુજરાતી) — NEVER Devanagari",  "sample": "નમસ્તે, કેમ છો?"},
+    "punjabi":      {"label": "Punjabi",                "script": "Gurmukhi (ਪੰਜਾਬੀ)",                              "sample": "ਸਤ ਸ੍ਰੀ ਅਕਾਲ, ਤੁਸੀਂ ਕਿਵੇਂ ਹੋ?"},
+    "urdu":         {"label": "Urdu",                   "script": "Perso-Arabic Nastaliq (اردو) RTL — NEVER Devanagari", "sample": "السلام علیکم، آپ کیسے ہیں؟"},
+    "sanskrit":     {"label": "Sanskrit",               "script": "Devanagari (संस्कृतम्), classical grammar (विभक्ति, सन्धि, विसर्ग)", "sample": "नमस्ते, भवान् कथम् अस्ति?"},
+    "spanish":      {"label": "Spanish",                "script": "Latin (Spanish alphabet)",                       "sample": "Hola, ¿cómo estás?"},
+    "french":       {"label": "French",                 "script": "Latin (French alphabet)",                        "sample": "Bonjour, comment ça va ?"},
+    "german":       {"label": "German",                 "script": "Latin (German alphabet)",                        "sample": "Hallo, wie geht es dir?"},
+    "arabic":       {"label": "Arabic",                 "script": "Arabic script (العربية) RTL",                    "sample": "مرحباً، كيف حالك؟"},
+    "japanese":     {"label": "Japanese",               "script": "Kana + Kanji (日本語)",                            "sample": "こんにちは、お元気ですか？"},
+    "chinese":      {"label": "Chinese (Simplified)",   "script": "Simplified Hanzi (中文)",                         "sample": "你好，最近怎么样？"},
+}
+
+
+def build_chat_response_language_directive(code: Optional[str]) -> str:
+    """Return an extra system-message block based on the user's chosen reply language.
+
+    Returns an empty string when code is None/empty/'auto' — default behaviour applies.
+    """
+    if not code:
+        return ""
+    c = code.strip().lower()
+    if c in ("", "auto"):
+        return ""
+    rule = _CHAT_RESPONSE_LANG_RULES.get(c)
+    if not rule:
+        return ""
+    label = rule["label"]
+    script = rule["script"]
+    sample = rule["sample"]
+    return (
+        "\n\n=== USER-PREFERRED REPLY LANGUAGE (HIGH PRIORITY) ===\n"
+        f"The user has explicitly chosen: **{label}**.\n"
+        f"REQUIRED SCRIPT: {script}.\n"
+        f"Native sample: \"{sample}\"\n"
+        "\n"
+        "RULES (override the language defaults above):\n"
+        f"1. For GENERAL questions (grammar tips, advice, casual chat, definitions), reply primarily in {label} using the REQUIRED SCRIPT.\n"
+        f"2. For TRANSLATION requests — KEEP the TRANSLATION FORMAT (the labelled block with <Lang>: line, Translation:, Casual/Short Version, Quick Tip). The <Lang>: line still uses the target language requested by the user (e.g. if they ask 'translate to French', use French script there). BUT the surrounding explanations — 'Quick Tip', any follow-up sentence, and any extra commentary — MUST be written in {label} using the REQUIRED SCRIPT.\n"
+        f"3. NEVER mix scripts within one word. Stay strictly within the REQUIRED SCRIPT for {label}.\n"
+        f"4. If the user's message itself is written in a clearly different language and they have not asked for a translation, you may continue in their language out of politeness — but default back to {label} on the next reply.\n"
+        f"5. Keep total reply ≤ 180 words. No markdown headers, no code fences.\n"
+        "=== END REPLY-LANGUAGE BLOCK ===\n"
+    )

@@ -27,6 +27,7 @@ from prompts import (
     OCR_SYSTEM_MESSAGE,
     format_prompt as _format_prompt,
     vocab_payload_valid as _vocab_payload_valid,
+    build_chat_response_language_directive as _build_chat_lang_directive,
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -94,6 +95,7 @@ class AIToolResponse(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    response_language: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -751,7 +753,7 @@ async def ai_chat(req: ChatRequest, authorization: Optional[str] = Header(None))
         {"session_id": req.session_id}, {"_id": 0}
     ).sort("created_at", 1).to_list(50)
 
-    system = CHAT_SYSTEM_MESSAGE
+    system = CHAT_SYSTEM_MESSAGE + _build_chat_lang_directive(req.response_language)
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=req.session_id,
