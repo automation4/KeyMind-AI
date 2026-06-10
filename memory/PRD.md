@@ -108,3 +108,9 @@ Horizontally scrollable toolbar above the input. All 16 tools wired to a single 
 3. **Chat translation format** (`prompts.py`): fixed line order — 1st `Say it:` (Roman transliteration, ask-language), 2nd `Meaning:` (English), 3rd `<Lang>:` (native script). The 3rd line's script follows the AI reply-language selector when it's a variant (e.g. Konkani-Romi → Roman). Verified via curl (default + konkani-romi).
 
 Known env note: Metro runs in CI mode (no hot reload) — restart expo after frontend edits. Do NOT issue parallel search_replace calls on the SAME file (edits clobber each other).
+
+## Changelog — 2026-02 (part 2: describe&translate merge + chat picker removal)
+1. **Retrigger spinner**: circular refresh button beside "AI WRITING TOOLS" heading (Write tab) re-runs the active tool; shows ActivityIndicator while loading (`testID=retrigger-tool-btn`).
+2. **Describe renamed** → "Describe & Translate" (tools.ts, id still `vocab`).
+3. **Translate tool removed** from TOOLS (Describe & Translate covers it). Count auto-shows 13; onboarding copy updated.
+4. **Chat reply-language picker removed** (blue-cross request): deleted ChatResponseLanguagePicker.tsx, useChatResponseLanguage.ts, chatResponseLanguages.ts; chat.tsx composer now only has the dictate-language chip; api.chat() no longer sends response_language. Backend still accepts the optional field (harmless, unused).

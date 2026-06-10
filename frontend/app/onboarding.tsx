@@ -53,7 +53,7 @@ const SLIDES: Slide[] = [
   {
     title: "Ready to\nTake Off?",
     subtitle:
-      "14 AI tools — grammar, paraphrase, translate, idioms, vocab & dictation. Let’s go!",
+      "13 AI tools — grammar, paraphrase, translate, idioms, vocab & dictation. Let’s go!",
     lottie: require("@/src/assets/lottie/rocket.json"),
     bg: COLORS.sky,
     fallbackIcon: "rocket",

@@ -78,10 +78,10 @@ export const api = {
       body: { text, voice },
     }),
 
-  chat: (session_id: string, message: string, response_language?: string) =>
+  chat: (session_id: string, message: string) =>
     request<{ session_id: string; reply: string }>("/ai/chat", {
       method: "POST",
-      body: { session_id, message, response_language },
+      body: { session_id, message },
       auth: true,
     }),
   chatHistory: (session_id: string) =>

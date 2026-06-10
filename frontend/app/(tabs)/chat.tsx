@@ -19,10 +19,8 @@ import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
 import { MicButton } from "@/src/components/MicButton";
 import { DictateLanguagePicker } from "@/src/components/DictateLanguagePicker";
-import { ChatResponseLanguagePicker } from "@/src/components/ChatResponseLanguagePicker";
 import { MarkdownText, stripMarkdown } from "@/src/components/MarkdownText";
 import { VocabCard, VocabData, VocabLanguage } from "@/src/components/VocabCard";
-import { useChatResponseLanguage } from "@/src/hooks/useChatResponseLanguage";
 import { storage } from "@/src/utils/storage";
 
 const VOCAB_LANG_KEY = "keymind_vocab_lang";
@@ -83,7 +81,6 @@ export default function ChatScreen() {
   const [vocabLang, setVocabLang] = useState<VocabLanguage>("Hindi");
   const [chatInterim, setChatInterim] = useState("");
   const [chatListening, setChatListening] = useState(false);
-  const { lang: responseLang } = useChatResponseLanguage();
   const scrollRef = useRef<ScrollView>(null);
   // Track whether we should auto-scroll to bottom when ScrollView content size changes.
   // Set to true ONLY right after a new message is added — prevents listen-button taps
@@ -146,7 +143,7 @@ export default function ChatScreen() {
     }
 
     try {
-      const res = await api.chat(sessionId, message, responseLang);
+      const res = await api.chat(sessionId, message);
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
       scrollToBottom();
     } catch (e: any) {
@@ -302,7 +299,6 @@ export default function ChatScreen() {
         <View style={styles.composer}>
           <View style={styles.composerLangRow}>
             <DictateLanguagePicker compact />
-            <ChatResponseLanguagePicker compact />
           </View>
           <View style={styles.composerRow}>
             <TextInput

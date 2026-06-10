@@ -237,7 +237,25 @@ export default function WriteScreen() {
         ) : null}
 
         {/* Tools selector (dropdown) */}
-        <Text style={styles.section}>AI WRITING TOOLS</Text>
+        <View style={styles.sectionRow}>
+          <Text style={[styles.section, { marginTop: 0, marginBottom: 0 }]}>
+            AI WRITING TOOLS
+          </Text>
+          {activeTool ? (
+            <TouchableOpacity
+              style={styles.retriggerBtn}
+              onPress={retry}
+              disabled={loading || vocabReloading}
+              testID="retrigger-tool-btn"
+            >
+              {loading || vocabReloading ? (
+                <ActivityIndicator size="small" color={COLORS.text} />
+              ) : (
+                <Ionicons name="refresh" size={16} color={COLORS.text} />
+              )}
+            </TouchableOpacity>
+          ) : null}
+        </View>
         <TouchableOpacity
           style={styles.dropdown}
           onPress={() => setToolPickerOpen(true)}
@@ -464,6 +482,24 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginTop: 24,
     marginBottom: 12,
+  },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  retriggerBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    ...SHADOW.brutalSm,
   },
   dropdown: {
     flexDirection: "row",
