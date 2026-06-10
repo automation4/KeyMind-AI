@@ -75,23 +75,6 @@ export const SimpleDescribeCard: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* Simple English explanation */}
-      {data.meaning_simple ? (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>SIMPLE EXPLANATION</Text>
-            <ListenButton
-              text={data.meaning_simple}
-              small
-              testID="listen-meaning"
-            />
-          </View>
-          <Text style={styles.meaningEn} selectable>
-            {data.meaning_simple}
-          </Text>
-        </View>
-      ) : null}
-
       {/* WHEN SPEAKING — direct translation of the user's sentence/phrase */}
       {data.sentence_translated && data.input_kind !== "word" ? (
         <View style={styles.section}>
@@ -219,6 +202,23 @@ export const SimpleDescribeCard: React.FC<Props> = ({
           </>
         )}
       </View>
+
+      {/* Simple English explanation — shown last */}
+      {data.meaning_simple ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>SIMPLE EXPLANATION</Text>
+            <ListenButton
+              text={data.meaning_simple}
+              small
+              testID="listen-meaning"
+            />
+          </View>
+          <Text style={styles.meaningEn} selectable>
+            {data.meaning_simple}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 };
