@@ -48,6 +48,60 @@ export const SimpleDescribeCard: React.FC<Props> = ({
   testID,
 }) => {
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const hasSentenceSection = !!(data.sentence_translated && data.input_kind !== "word");
+
+  const langToggle = onLanguageChange ? (
+    <TouchableOpacity
+      onPress={() => setPickerOpen((v) => !v)}
+      style={styles.langPickerBtn}
+      testID="describe-lang-toggle"
+    >
+      <Ionicons
+        name={pickerOpen ? "chevron-up" : "chevron-down"}
+        size={14}
+        color={COLORS.text}
+      />
+    </TouchableOpacity>
+  ) : null;
+
+  const langChips =
+    pickerOpen && onLanguageChange ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
+      >
+        {VOCAB_LANGUAGES.map((l) => {
+          const active = l === language;
+          return (
+            <TouchableOpacity
+              key={l}
+              onPress={() => {
+                onLanguageChange(l);
+                setPickerOpen(false);
+              }}
+              style={[
+                styles.langChip,
+                active && {
+                  backgroundColor: COLORS.text,
+                  borderColor: COLORS.text,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.langChipText,
+                  active && { color: COLORS.surface },
+                ]}
+              >
+                {l}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    ) : null;
+
   return (
     <View style={styles.card} testID={testID || "describe-card"}>
       {/* Header — word + LISTEN + pos pill */}
@@ -75,19 +129,23 @@ export const SimpleDescribeCard: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* WHEN SPEAKING — direct translation of the user's sentence/phrase */}
-      {data.sentence_translated && data.input_kind !== "word" ? (
+      {/* HOW TO SAY IT — direct translation of the user's sentence/phrase (with language selector) */}
+      {hasSentenceSection ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>
-              HOW TO SAY IT IN {language.toUpperCase()}
-            </Text>
+            <View style={styles.languageHeader}>
+              <Text style={styles.sectionLabel}>
+                HOW TO SAY IT IN {language.toUpperCase()}
+              </Text>
+              {langToggle}
+            </View>
             <ListenButton
               text={data.sentence_translated}
               small
               testID="listen-sentence-translated"
             />
           </View>
+          {langChips}
           <Text
             style={styles.meaningNative}
             selectable
@@ -110,24 +168,29 @@ export const SimpleDescribeCard: React.FC<Props> = ({
         </View>
       ) : null}
 
-      {/* Translated meaning + Hinglish */}
+      {/* Simple English explanation */}
+      {data.meaning_simple ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>SIMPLE EXPLANATION</Text>
+            <ListenButton
+              text={data.meaning_simple}
+              small
+              testID="listen-meaning"
+            />
+          </View>
+          <Text style={styles.meaningEn} selectable>
+            {data.meaning_simple}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Translated meaning + Hinglish — shown last */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.languageHeader}>
             <Text style={styles.sectionLabel}>IN {language.toUpperCase()}</Text>
-            {onLanguageChange ? (
-              <TouchableOpacity
-                onPress={() => setPickerOpen((v) => !v)}
-                style={styles.langPickerBtn}
-                testID="describe-lang-toggle"
-              >
-                <Ionicons
-                  name={pickerOpen ? "chevron-up" : "chevron-down"}
-                  size={14}
-                  color={COLORS.text}
-                />
-              </TouchableOpacity>
-            ) : null}
+            {!hasSentenceSection ? langToggle : null}
           </View>
           {!loading && data.meaning_translated ? (
             <ListenButton
@@ -138,42 +201,7 @@ export const SimpleDescribeCard: React.FC<Props> = ({
           ) : null}
         </View>
 
-        {pickerOpen && onLanguageChange ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
-          >
-            {VOCAB_LANGUAGES.map((l) => {
-              const active = l === language;
-              return (
-                <TouchableOpacity
-                  key={l}
-                  onPress={() => {
-                    onLanguageChange(l);
-                    setPickerOpen(false);
-                  }}
-                  style={[
-                    styles.langChip,
-                    active && {
-                      backgroundColor: COLORS.text,
-                      borderColor: COLORS.text,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.langChipText,
-                      active && { color: COLORS.surface },
-                    ]}
-                  >
-                    {l}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        ) : null}
+        {!hasSentenceSection ? langChips : null}
 
         {loading ? (
           <View style={styles.loadingRow}>
@@ -196,23 +224,6 @@ export const SimpleDescribeCard: React.FC<Props> = ({
           </>
         )}
       </View>
-
-      {/* Simple English explanation — shown last */}
-      {data.meaning_simple ? (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>SIMPLE EXPLANATION</Text>
-            <ListenButton
-              text={data.meaning_simple}
-              small
-              testID="listen-meaning"
-            />
-          </View>
-          <Text style={styles.meaningEn} selectable>
-            {data.meaning_simple}
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 };

@@ -101,3 +101,10 @@ Horizontally scrollable toolbar above the input. All 16 tools wired to a single 
 - Google Play Billing real subscription
 - Firebase Phone OTP, Facebook Login (require dev builds)
 - High-quality neural TTS via Google Cloud / Bhashini (currently uses device `expo-speech`)
+
+## Changelog — 2026-02 (fork: describe layout + tool count + chat format)
+1. **Describe card reorder** (`SimpleDescribeCard.tsx`): new section order = HOW TO SAY IT IN X (now hosts the language-selector chevron + chips) → SIMPLE EXPLANATION → IN X (translated meaning + transliteration, moved to bottom). Lang selector falls back to the IN X header for single-word inputs.
+2. **Tool count fix**: "16 tools" → dynamic `${TOOLS.length}` (14) in Write tab dropdown; onboarding copy updated to "14 AI tools".
+3. **Chat translation format** (`prompts.py`): fixed line order — 1st `Say it:` (Roman transliteration, ask-language), 2nd `Meaning:` (English), 3rd `<Lang>:` (native script). The 3rd line's script follows the AI reply-language selector when it's a variant (e.g. Konkani-Romi → Roman). Verified via curl (default + konkani-romi).
+
+Known env note: Metro runs in CI mode (no hot reload) — restart expo after frontend edits. Do NOT issue parallel search_replace calls on the SAME file (edits clobber each other).

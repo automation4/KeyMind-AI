@@ -14,7 +14,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
-import { TOOL_BY_ID } from "@/src/lib/tools";
+import { TOOL_BY_ID, TOOLS } from "@/src/lib/tools";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useTheme } from "@/src/contexts/ThemeContext";
@@ -272,7 +272,7 @@ export default function WriteScreen() {
               <Text style={styles.dropdownSub} numberOfLines={1}>
                 {activeTool
                   ? TOOL_BY_ID[activeTool]?.description
-                  : "16 tools — grammar, translate, paraphrase & more"}
+                  : `${TOOLS.length} tools — grammar, translate, paraphrase & more`}
               </Text>
             </View>
           </View>
