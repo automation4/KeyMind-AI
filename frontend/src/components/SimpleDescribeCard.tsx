@@ -82,22 +82,19 @@ export const SimpleDescribeCard: React.FC<Props> = ({
             <Text style={styles.sectionLabel}>
               HOW TO SAY IT IN {language.toUpperCase()}
             </Text>
-          </View>
-          <View style={styles.translatedLine}>
-            <Text
-              style={styles.meaningNative}
-              selectable
-              testID="describe-sentence-translated"
-            >
-              {data.sentence_translated}
-            </Text>
             <ListenButton
               text={data.sentence_translated}
               small
-              compact
               testID="listen-sentence-translated"
             />
           </View>
+          <Text
+            style={styles.meaningNative}
+            selectable
+            testID="describe-sentence-translated"
+          >
+            {data.sentence_translated}
+          </Text>
           {data.sentence_transliterated && needsRoman(language) ? (
             <View style={styles.translitWrap}>
               <Text style={styles.translitLabel}>{romanLabel(language)}</Text>
@@ -132,6 +129,13 @@ export const SimpleDescribeCard: React.FC<Props> = ({
               </TouchableOpacity>
             ) : null}
           </View>
+          {!loading && data.meaning_translated ? (
+            <ListenButton
+              text={data.meaning_translated}
+              small
+              testID="listen-translated"
+            />
+          ) : null}
         </View>
 
         {pickerOpen && onLanguageChange ? (
@@ -178,19 +182,9 @@ export const SimpleDescribeCard: React.FC<Props> = ({
           </View>
         ) : (
           <>
-            <View style={styles.translatedLine}>
-              <Text style={styles.meaningNative} selectable testID="describe-translated">
-                {data.meaning_translated || "—"}
-              </Text>
-              {data.meaning_translated ? (
-                <ListenButton
-                  text={data.meaning_translated}
-                  small
-                  compact
-                  testID="listen-translated"
-                />
-              ) : null}
-            </View>
+            <Text style={styles.meaningNative} selectable testID="describe-translated">
+              {data.meaning_translated || "—"}
+            </Text>
             {data.meaning_transliterated && needsRoman(language) ? (
               <View style={styles.translitWrap}>
                 <Text style={styles.translitLabel}>{romanLabel(language)}</Text>
