@@ -28,6 +28,8 @@ import { ToolOptionsSheet } from "@/src/components/write/ToolOptionsSheet";
 import {
   ResultSuggestion,
   GrammarMetaCard,
+  IdiomsCard,
+  SummaryCard,
   ResultPayload,
 } from "@/src/components/write/ResultCard";
 import { storage } from "@/src/utils/storage";
@@ -335,6 +337,14 @@ export default function WriteScreen() {
                     setVocabReloading(false);
                   }
                 }}
+              />
+            ) : result.tool === "idioms" && result.data ? (
+              <IdiomsCard data={result.data} />
+            ) : result.tool === "summarize" ? (
+              <SummaryCard
+                suggestions={result.suggestions}
+                onApply={apply}
+                onCopy={copy}
               />
             ) : (
               <>

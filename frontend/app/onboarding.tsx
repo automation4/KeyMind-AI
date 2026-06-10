@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   Platform,
+  PanResponder,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -109,6 +110,20 @@ export default function Onboarding() {
     }
   };
 
+  const prev = () => {
+    if (index > 0) setIndex(index - 1);
+  };
+
+  // Refs to give the PanResponder access to the latest closures.
+  const nextRef = useRef(next);
+  const prevRef = useRef(prev);
+  const finishRef = useRef(finish);
+  useEffect(() => {
+    nextRef.current = next;
+    prevRef.current = prev;
+    finishRef.current = finish;
+  });
+
   const pressIn = () => {
     Animated.spring(buttonScale, {
       toValue: 0.96,
@@ -126,6 +141,35 @@ export default function Onboarding() {
 
   const isLast = index === SLIDES.length - 1;
   const current = SLIDES[index];
+
+  // Swipe gestures: left → next/finish, right → previous, down (long) → skip onboarding.
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_e, g) => {
+        // Only claim the gesture if the user is clearly swiping (not tapping a button)
+        const ax = Math.abs(g.dx);
+        const ay = Math.abs(g.dy);
+        return ax > 12 || ay > 18;
+      },
+      onPanResponderRelease: (_e, g) => {
+        const SWIPE_X = 60;
+        const SWIPE_Y = 90;
+        if (g.dy > SWIPE_Y && Math.abs(g.dy) > Math.abs(g.dx)) {
+          // swipe down → skip entire onboarding
+          finishRef.current?.();
+          return;
+        }
+        if (g.dx <= -SWIPE_X) {
+          // swipe left → next
+          nextRef.current?.();
+        } else if (g.dx >= SWIPE_X) {
+          // swipe right → previous
+          prevRef.current?.();
+        }
+      },
+    }),
+  ).current;
 
   return (
     <SafeAreaView
@@ -151,6 +195,7 @@ export default function Onboarding() {
           { opacity: fade, transform: [{ translateY: slide }] },
         ]}
         testID={`onboarding-slide-${index}`}
+        {...panResponder.panHandlers}
       >
         <View style={styles.lottieFrame}>
           <LottieView

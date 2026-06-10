@@ -21,6 +21,12 @@ export type VocabData = {
   tricky_words?: string[];
   meaning_translated?: string;
   meaning_transliterated?: string;
+  /** Direct translation of the user's sentence/phrase (input_kind = sentence|phrase) — native script. */
+  sentence_translated?: string;
+  /** Latin transliteration of the user's sentence/phrase. */
+  sentence_transliterated?: string;
+  /** 'word' | 'phrase' | 'sentence' — auto-detected by the model. */
+  input_kind?: string;
   synonyms?: string[];
   antonyms?: string[];
   spoken_usage?: string;

@@ -695,6 +695,36 @@ async def ai_tool(req: AIToolRequest, authorization: Optional[str] = Header(None
                 logger.exception("Vocab retry failed")
         # Keep suggestions as the raw text fallback; UI prefers `data` when present.
         suggestions = [raw]
+    elif req.tool == "idioms":
+        parsed = _safe_parse_json(raw)
+        items: List[Dict[str, Any]] = []
+        kind: Optional[str] = None
+        if isinstance(parsed, dict):
+            kind = str(parsed.get("input_kind") or "").lower().strip() or None
+            raw_items = parsed.get("items") or []
+            if isinstance(raw_items, list):
+                for it in raw_items:
+                    if not isinstance(it, dict):
+                        continue
+                    idiom = str(it.get("idiom") or "").strip()
+                    meaning = str(it.get("meaning") or "").strip()
+                    examples_raw = it.get("examples") or []
+                    if not isinstance(examples_raw, list):
+                        examples_raw = []
+                    examples = [str(e).strip() for e in examples_raw if str(e).strip()][:2]
+                    if idiom and meaning:
+                        items.append({"idiom": idiom, "meaning": meaning, "examples": examples})
+        if items:
+            # When kind == 'sentence', strip examples (per spec).
+            if kind == "sentence":
+                for it in items:
+                    it["examples"] = []
+            data = {"input_kind": kind or ("idiom" if len(items) == 1 else "sentence"), "items": items}
+            suggestions = [f"{it['idiom']} — {it['meaning']}" for it in items]
+        else:
+            # Fallback: model returned plain text — keep old multi-sentence UX.
+            fallback = _parse_numbered_list(raw)
+            suggestions = fallback if fallback else [raw]
     elif req.tool in multi_tools:
         suggestions = _parse_numbered_list(raw)
         # Comma-separated outputs (synonyms / antonyms) come back as one chunk — split them.

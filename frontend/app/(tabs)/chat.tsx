@@ -18,6 +18,7 @@ import { api } from "@/src/lib/api";
 import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
 import { MicButton } from "@/src/components/MicButton";
+import { DictateLanguagePicker } from "@/src/components/DictateLanguagePicker";
 import { MarkdownText, stripMarkdown } from "@/src/components/MarkdownText";
 import { VocabCard, VocabData, VocabLanguage } from "@/src/components/VocabCard";
 import { storage } from "@/src/utils/storage";
@@ -78,6 +79,8 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [vocabLang, setVocabLang] = useState<VocabLanguage>("Hindi");
+  const [chatInterim, setChatInterim] = useState("");
+  const [chatListening, setChatListening] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   // Track whether we should auto-scroll to bottom when ScrollView content size changes.
   // Set to true ONLY right after a new message is added — prevents listen-button taps
@@ -294,33 +297,50 @@ export default function ChatScreen() {
         </ScrollView>
 
         <View style={styles.composer}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder="Ask about grammar, words, languages…"
-            placeholderTextColor={COLORS.textMuted}
-            style={styles.composerInput}
-            multiline
-            testID="chat-input"
-          />
-          <MicButton
-            size={40}
-            onTranscribe={(spoken) => {
-              setInput((prev) => {
-                if (!prev) return spoken;
-                const sep = prev.endsWith(" ") ? "" : " ";
-                return prev + sep + spoken;
-              });
-            }}
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, (!input.trim() || busy) && { opacity: 0.5 }]}
-            onPress={() => send()}
-            disabled={!input.trim() || busy}
-            testID="chat-send-btn"
-          >
-            <Ionicons name="arrow-up" size={20} color={COLORS.bg} />
-          </TouchableOpacity>
+          <View style={styles.composerLangRow}>
+            <DictateLanguagePicker compact />
+          </View>
+          <View style={styles.composerRow}>
+            <TextInput
+              value={chatInterim ? `${input}${input ? " " : ""}${chatInterim}` : input}
+              onChangeText={(v) => {
+                if (chatListening) return; // ignore manual edits while mic is live
+                setInput(v);
+              }}
+              editable={!chatListening}
+              placeholder="Ask about grammar, words, languages…"
+              placeholderTextColor={COLORS.textMuted}
+              style={styles.composerInput}
+              multiline
+              testID="chat-input"
+            />
+            <MicButton
+              size={40}
+              onFinal={(spoken) => {
+                setInput((prev) => {
+                  const t = spoken.trim();
+                  if (!t) return prev;
+                  if (!prev) return t;
+                  const sep = /[.!?…\n]\s*$/.test(prev)
+                    ? " "
+                    : prev.endsWith(" ")
+                    ? ""
+                    : " ";
+                  return prev + sep + t;
+                });
+              }}
+              onInterim={setChatInterim}
+              onListeningChange={setChatListening}
+            />
+            <TouchableOpacity
+              style={[styles.sendBtn, (!input.trim() || busy) && { opacity: 0.5 }]}
+              onPress={() => send()}
+              disabled={!input.trim() || busy}
+              testID="chat-send-btn"
+            >
+              <Ionicons name="arrow-up" size={20} color={COLORS.bg} />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -354,9 +374,17 @@ const styles = StyleSheet.create({
   aiBubble: { alignSelf: "flex-start", backgroundColor: COLORS.surface, ...SHADOW.brutalSm },
   bubbleText: { fontSize: 14, lineHeight: 22, color: COLORS.text, fontWeight: FONT.regular },
   composer: {
-    flexDirection: "row", alignItems: "flex-end", gap: 8,
     padding: 12, paddingBottom: 12, paddingTop: 8,
     borderTopWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.bg,
+    gap: 6,
+  },
+  composerLangRow: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    paddingHorizontal: 4,
+  },
+  composerRow: {
+    flexDirection: "row", alignItems: "flex-end", gap: 8,
   },
   composerInput: {
     flex: 1, minHeight: 44, maxHeight: 120,

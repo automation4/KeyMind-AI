@@ -151,6 +151,115 @@ export function GrammarMetaCard({ data }: { data: any }) {
   );
 }
 
+/** Idioms card — different layouts for idiom-input vs sentence-input. */
+export function IdiomsCard({ data }: { data: any }) {
+  const kind: string = data?.input_kind || "idiom";
+  const items: Array<{
+    idiom?: string;
+    meaning?: string;
+    examples?: string[];
+  }> = Array.isArray(data?.items) ? data.items : [];
+  if (!items.length) return null;
+  const headerLabel =
+    kind === "sentence" ? "RELATED IDIOMS" : "IDIOM MEANING & EXAMPLES";
+
+  return (
+    <View style={styles.idiomsCard} testID="idioms-card">
+      <Text style={styles.idiomsHeader}>{headerLabel}</Text>
+      {items.map((it, idx) => (
+        <View key={idx} style={styles.idiomItem}>
+          <View style={styles.idiomTitleRow}>
+            <Text style={styles.idiomTitle} selectable>
+              {it.idiom || ""}
+            </Text>
+            <ListenButton
+              text={it.idiom || ""}
+              small
+              compact
+              testID={`listen-idiom-title-${idx}`}
+            />
+          </View>
+          {it.meaning ? (
+            <Text style={styles.idiomMeaning} selectable>
+              {it.meaning}
+            </Text>
+          ) : null}
+          {Array.isArray(it.examples) && it.examples.length > 0 ? (
+            <View style={{ gap: 6, marginTop: 6 }}>
+              <Text style={styles.idiomExamplesLabel}>EXAMPLES</Text>
+              {it.examples.map((ex, exIdx) => (
+                <View key={exIdx} style={styles.exampleRow}>
+                  <Text style={styles.exampleText} selectable>
+                    {ex}
+                  </Text>
+                  <ListenButton
+                    text={ex}
+                    small
+                    compact
+                    testID={`listen-idiom-ex-${idx}-${exIdx}`}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Summary card — bullet list rendering with a single "Listen to all" button. */
+export function SummaryCard({
+  suggestions,
+  onApply,
+  onCopy,
+}: {
+  suggestions: string[];
+  onApply: (s: string) => void;
+  onCopy: (s: string) => void;
+}) {
+  const bullets = (suggestions || []).map((s) => s.trim()).filter(Boolean);
+  if (!bullets.length) return null;
+  const allText = bullets.join(". ");
+  const combined = bullets.map((b) => `• ${b}`).join("\n");
+  return (
+    <View style={styles.idiomsCard} testID="summary-card">
+      <View style={styles.summaryHeader}>
+        <Text style={styles.idiomsHeader}>SUMMARY · KEY POINTS</Text>
+        <ListenButton text={allText} small testID="listen-summary-all" />
+      </View>
+      <View style={{ gap: 8 }}>
+        {bullets.map((b, idx) => (
+          <View key={idx} style={styles.bulletRow}>
+            <Text style={styles.bulletDot}>•</Text>
+            <Text style={styles.bulletText} selectable>
+              {b}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <View style={[styles.resultActions, { marginTop: 14 }]}>
+        <TouchableOpacity
+          style={styles.applyBtn}
+          onPress={() => onApply(combined)}
+          testID="apply-summary"
+        >
+          <Ionicons name="checkmark" size={16} color={COLORS.bg} />
+          <Text style={styles.applyText}>APPLY</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.dismissBtn}
+          onPress={() => onCopy(combined)}
+          testID="copy-summary"
+        >
+          <Ionicons name="copy-outline" size={14} color={COLORS.text} />
+          <Text style={styles.dismissText}>COPY</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   resultCard: {
     backgroundColor: COLORS.surface,
@@ -297,5 +406,76 @@ const styles = StyleSheet.create({
     fontWeight: FONT.black,
     color: COLORS.text,
     letterSpacing: 0.5,
+  },
+
+  // Idioms / Summary cards
+  idiomsCard: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    marginBottom: 12,
+    gap: 14,
+    ...SHADOW.brutal,
+  },
+  idiomsHeader: {
+    fontSize: 10,
+    fontWeight: FONT.black,
+    letterSpacing: 1.5,
+    color: COLORS.textMuted,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  idiomItem: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderSoft,
+    paddingTop: 12,
+    gap: 6,
+  },
+  idiomTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  idiomTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: FONT.black,
+    color: COLORS.text,
+  },
+  idiomMeaning: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLORS.text,
+    fontWeight: FONT.bold,
+  },
+  idiomExamplesLabel: {
+    fontSize: 10,
+    fontWeight: FONT.black,
+    letterSpacing: 1.2,
+    color: COLORS.textMuted,
+  },
+  bulletRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  bulletDot: {
+    fontSize: 18,
+    color: COLORS.text,
+    lineHeight: 22,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    color: COLORS.text,
+    fontWeight: FONT.bold,
   },
 });

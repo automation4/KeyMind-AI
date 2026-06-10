@@ -92,6 +92,44 @@ export const SimpleDescribeCard: React.FC<Props> = ({
         </View>
       ) : null}
 
+      {/* WHEN SPEAKING — direct translation of the user's sentence/phrase */}
+      {data.sentence_translated && data.input_kind !== "word" ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>
+              HOW TO SAY IT IN {language.toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.translatedLine}>
+            <Text
+              style={styles.meaningNative}
+              selectable
+              testID="describe-sentence-translated"
+            >
+              {data.sentence_translated}
+            </Text>
+            <ListenButton
+              text={data.sentence_translated}
+              small
+              compact
+              testID="listen-sentence-translated"
+            />
+          </View>
+          {data.sentence_transliterated && needsRoman(language) ? (
+            <View style={styles.translitWrap}>
+              <Text style={styles.translitLabel}>{romanLabel(language)}</Text>
+              <Text
+                style={styles.translitText}
+                selectable
+                testID="describe-sentence-transliterated"
+              >
+                {data.sentence_transliterated}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {/* Translated meaning + Hinglish */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>

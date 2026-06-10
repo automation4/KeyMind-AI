@@ -62,12 +62,14 @@ TOOL_PROMPTS: Dict[str, str] = {
         "  \"pronunciation\": \"<American-English respelling, syllables separated by ' · ' (space middle-dot space) with the STRESSED syllable in UPPERCASE. Examples: astonished → 'uh · STAW · nuhsht'. EMPTY STRING for phrases, sentences, or non-English input.>\",\n"
         "  \"meaning_simple\": \"<For a word/phrase: one or two short ENGLISH sentences explaining what it means using everyday vocabulary a 10-year-old understands. For a SENTENCE: explain in plain ENGLISH what the user's sentence is actually saying / conveying — paraphrase it naturally (e.g. 'The speaker is expressing frustration about something annoying.'). 1–2 sentences max.>\",\n"
         "  \"meaning_translated\": \"<the SAME explanation as meaning_simple, written in {target_language} using its NATIVE script. For sentences, this should be a natural translation of meaning_simple — NOT a word-for-word translation of the user's original sentence.>\",\n"
-        "  \"meaning_transliterated\": \"<meaning_translated written ONLY in the Latin (English) alphabet — Hinglish / Tanglish / Tenglish / Banglish / Romaji / Pinyin etc. EMPTY STRING if target_language is already Latin (English/Spanish/French/German).>\"\n"
+        "  \"meaning_transliterated\": \"<meaning_translated written ONLY in the Latin (English) alphabet — Hinglish / Tanglish / Tenglish / Banglish / Romaji / Pinyin etc. EMPTY STRING if target_language is already Latin (English/Spanish/French/German).>\",\n"
+        "  \"sentence_translated\": \"<DIRECT translation of the user's input sentence/phrase into {target_language} NATIVE script — this is how a native speaker would actually SAY/WRITE the sentence (NOT the meaning explanation). EMPTY STRING if input_kind is 'word' or if target_language is English and the input is already English.>\",\n"
+        "  \"sentence_transliterated\": \"<sentence_translated written ONLY in Latin (English) alphabet — Hinglish / Tanglish / Tenglish / Banglish etc. EMPTY STRING if input_kind is 'word' OR if target_language is already Latin.>\"\n"
         "}\n"
         "INPUT KIND DETECTION:\n"
-        "→ Single word (no spaces, possibly hyphenated) → input_kind='word', pronunciation populated.\n"
-        "→ 2–4 word phrase / idiom (no terminal punctuation) → input_kind='phrase', pronunciation=''.\n"
-        "→ A grammatically complete sentence (has subject + verb, or ends with . ! ?) → input_kind='sentence', pronunciation=''. Treat as a sentence even if only 3 words ('It is irritating.').\n"
+        "→ Single word (no spaces, possibly hyphenated) → input_kind='word', pronunciation populated, sentence_translated='', sentence_transliterated=''.\n"
+        "→ 2–4 word phrase / idiom (no terminal punctuation) → input_kind='phrase', pronunciation='', sentence_translated and sentence_transliterated populated.\n"
+        "→ A grammatically complete sentence (has subject + verb, or ends with . ! ?) → input_kind='sentence', pronunciation='', sentence_translated and sentence_transliterated populated.\n"
         "PRONUNCIATION RULES (Merriam-Webster respelling — NOT IPA):\n"
         "→ Use ONLY a-z letters, dots, and spaces. Never use IPA symbols (ə, ʃ, θ, æ, etc.).\n"
         "→ Use 'uh' for schwa, 'aw' for /ɔ/, 'ee' for long e, 'ay' for long a, 'oh' for long o, 'oo' for long u, 'sh' for /ʃ/, 'th' for /θ/, 'ch' for /tʃ/, 'zh' for /ʒ/.\n"
@@ -75,10 +77,11 @@ TOOL_PROMPTS: Dict[str, str] = {
         "→ The single stressed syllable MUST be ALL UPPERCASE; unstressed syllables stay lowercase.\n"
         "→ EMPTY STRING for phrases / sentences / non-Latin / numbers.\n"
         "CRITICAL SCRIPT RULE:\n"
-        "→ 'meaning_translated' MUST be written in the NATIVE SCRIPT of {target_language}.\n"
+        "→ 'meaning_translated' and 'sentence_translated' MUST be written in the NATIVE SCRIPT of {target_language}.\n"
         "→ Tamil→Tamil, Telugu→Telugu, Bengali→Bengali, Kannada→Kannada, Malayalam→Malayalam, Gujarati→Gujarati, Punjabi→Gurmukhi, Urdu→Nastaliq, Hindi/Sanskrit/Marathi→Devanagari.\n"
         "→ DO NOT default to Hindi/Devanagari unless target is Hindi/Sanskrit/Marathi.\n"
-        "→ If target_language is English: meaning_translated == meaning_simple verbatim; meaning_transliterated = \"\".\n"
+        "→ If target_language is English AND the user's input is already English: meaning_translated == meaning_simple verbatim; meaning_transliterated = \"\"; sentence_translated = \"\" and sentence_transliterated = \"\".\n"
+        "→ If target_language is English BUT the user's input is non-English (e.g. Hindi text translated to English): sentence_translated = English translation of the input; sentence_transliterated = \"\".\n"
         "→ Transliterated MUST contain ONLY a-z A-Z and basic punctuation.\n"
         "Output JSON ONLY."
     ),
@@ -169,8 +172,10 @@ TOOL_PROMPTS: Dict[str, str] = {
         "language and tone. Return ONLY the expanded text."
     ),
     "summarize": (
-        "Summarize the text below concisely as 3-5 bullet points. Preserve the original language. "
-        "Return ONLY the bullet points (use '- ' prefix)."
+        "Summarize the text below as 4-7 bullet points in LAYMAN LANGUAGE (plain, easy words). "
+        "COVERAGE: every distinct main idea from the input MUST appear as a bullet — do not skip topics. "
+        "FORMAT: each bullet on its own line, '- ' prefix, ONE sentence per bullet, ≤ 18 words. "
+        "Preserve the input language. Return ONLY the bullets — no intro, no outro, no fences."
     ),
     "synonyms": (
         "List 6 context-aware SYNONYMS for the given English word/phrase. For each synonym, also give a "
@@ -185,11 +190,29 @@ TOOL_PROMPTS: Dict[str, str] = {
         "If a true antonym does not exist (proper nouns, technical terms), return a single line: `no common antonyms | —`."
     ),
     "idioms": (
-        "You are a native-English coach. The user gives you a word, phrase, or idiom. "
-        "Return 6 SHORT real-life sentences (each ≤ 18 words) that a native speaker would actually say in conversation, "
-        "media, or workplace chat USING the given word/idiom naturally. Mix registers (casual, professional, headline). "
-        "Quote no extra context. Format: one sentence per line, NO numbering, NO bullets, NO blank lines, NO surrounding quotes. "
-        "Return ONLY the 6 sentences."
+        "You are a native-English coach. The user gives you input that is EITHER:\n"
+        "  (A) an idiom / idiomatic phrase  (e.g. 'break the ice', 'piece of cake'), OR\n"
+        "  (B) a normal sentence / phrase that is NOT itself idiomatic.\n"
+        "\n"
+        "Auto-detect which kind it is, then output a STRICT JSON object — no markdown, no fences, no extra text:\n"
+        "{\n"
+        "  \"input_kind\": \"<'idiom' | 'sentence'>\",\n"
+        "  \"items\": [\n"
+        "    { \"idiom\": \"<the idiom phrase, lowercased unless it contains a proper noun>\",\n"
+        "      \"meaning\": \"<one short ENGLISH sentence in simple, everyday words explaining what it means (≤ 18 words)>\",\n"
+        "      \"examples\": [\"<example sentence 1>\", \"<example sentence 2>\"] }\n"
+        "  ]\n"
+        "}\n"
+        "\n"
+        "RULES:\n"
+        "(A) input_kind = 'idiom'  → items contains EXACTLY ONE entry: the user's idiom, its plain-English meaning, and EXACTLY 2 natural example sentences (≤ 16 words each) showing it used in real speech.\n"
+        "(B) input_kind = 'sentence' → items contains 4-6 RELATED idioms whose meaning reflects the situation / feeling / theme of the user's sentence. Each item has its 'meaning' filled — but the 'examples' array MUST be an empty list [].\n"
+        "\n"
+        "OTHER RULES:\n"
+        "• Use plain English in 'meaning' (no jargon).\n"
+        "• 'examples' MUST be an empty list when input_kind='sentence'.\n"
+        "• Never invent idioms — if you can't think of any real ones for the theme, return fewer items (minimum 3) instead of fabricating.\n"
+        "• Output JSON ONLY."
     ),
     "email": (
         "Write a complete professional email based on the user's brief idea below. Use {tone} tone. "
@@ -207,13 +230,19 @@ TOOL_PROMPTS: Dict[str, str] = {
 
 
 # Multi-suggestion tools — output is parsed as a numbered list (and pipe-split for synonyms/antonyms).
-MULTI_TOOLS = {"smart_reply", "paraphrase", "summarize", "synonyms", "antonyms", "idioms"}
+MULTI_TOOLS = {"smart_reply", "paraphrase", "summarize", "synonyms", "antonyms"}
 
 
 # Chat system message (Ask AI tab).
 CHAT_SYSTEM_MESSAGE = (
     "You are KeyMind AI Tutor — a friendly assistant who explains grammar rules, word meanings, "
-    "translations, and language usage clearly and simply in the user's preferred language. "
+    "translations, and language usage clearly and simply.\n"
+    "LANGUAGE RULES (READ TWICE):\n"
+    "• DEFAULT response language is ENGLISH.\n"
+    "• ONLY respond in a non-English language when the user EXPLICITLY asks for it "
+    "(e.g. 'in Hindi', 'reply in Tamil', 'मुझे हिंदी में बताओ', or the message itself is written in that language).\n"
+    "• NEVER auto-add a Hindi / Hinglish / Devanagari translation unless the user asked.\n"
+    "• When the user asks 'translate X to <lang>' or 'how do I say X in <lang>', give the translation in <lang>'s NATIVE script and ONE short ENGLISH line clarifying — nothing more.\n"
     "Keep responses concise (<150 words), use examples, and be encouraging."
 )
 
