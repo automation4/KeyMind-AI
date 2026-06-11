@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Animated,
+  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -29,15 +31,77 @@ type Props = {
 };
 
 export function ToolPickerSheet({ visible, activeTool, onClose, onSelect }: Props) {
+  // Keep the modal mounted while the exit animation plays.
+  const [rendered, setRendered] = useState(visible);
+  const backdrop = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(1)).current; // 1 = off-screen, 0 = open
+
+  useEffect(() => {
+    if (visible) {
+      setRendered(true);
+      backdrop.setValue(0);
+      slide.setValue(1);
+      Animated.parallel([
+        Animated.timing(backdrop, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(slide, {
+          toValue: 0,
+          damping: 18,
+          stiffness: 180,
+          mass: 0.8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (rendered) {
+      Animated.parallel([
+        Animated.timing(backdrop, {
+          toValue: 0,
+          duration: 160,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slide, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start(() => setRendered(false));
+    }
+  }, [visible, rendered, backdrop, slide]);
+
+  const translateY = slide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 480],
+  });
+  const scale = slide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.96],
+  });
+
+  const handleClose = useCallback(() => onClose(), [onClose]);
+
+  if (!rendered) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalBg}>
-        <View style={[styles.sheet, { maxHeight: "80%" }]}>
+    <Modal visible transparent animationType="none" onRequestClose={handleClose}>
+      <Animated.View style={[styles.modalBg, { opacity: backdrop }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleClose}
+          testID="tool-picker-backdrop"
+        />
+        <Animated.View
+          style={[
+            styles.sheet,
+            { maxHeight: "80%", transform: [{ translateY }, { scale }] },
+          ]}
+        >
           <View style={styles.sheetHandle} />
           <Text style={[styles.section, { marginTop: 4 }]}>SELECT A TOOL</Text>
           <ScrollView style={{ marginTop: 8 }} showsVerticalScrollIndicator={false}>
@@ -81,8 +145,8 @@ export function ToolPickerSheet({ visible, activeTool, onClose, onSelect }: Prop
           >
             <Text style={[styles.sheetBtnText, { color: COLORS.text }]}>CLOSE</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 }

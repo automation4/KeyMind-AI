@@ -15,6 +15,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Path } from "react-native-svg";
 
 import { useAuth } from "@/src/contexts/AuthContext";
 import { storage } from "@/src/utils/storage";
@@ -22,14 +23,31 @@ import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
 WebBrowser.maybeCompleteAuthSession();
 
-// Admin signs in with this email + admin password through the normal form.
-const ADMIN_EMAIL = "himthegreat@gmail.com";
+const GoogleLogo = ({ size = 20 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 48 48">
+    <Path
+      fill="#EA4335"
+      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+    />
+    <Path
+      fill="#4285F4"
+      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+    />
+    <Path
+      fill="#FBBC05"
+      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+    />
+    <Path
+      fill="#34A853"
+      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+    />
+  </Svg>
+);
 
 export default function Login() {
   const {
     signInWithSessionId,
     signInAsGuest,
-    signInAsAdmin,
     signInWithEmail,
     signUpWithEmail,
     user,
@@ -38,7 +56,6 @@ export default function Login() {
   const router = useRouter();
   const [busy, setBusy] = useState<"google" | "guest" | "email" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -69,7 +86,6 @@ export default function Login() {
   const handleGoogle = async () => {
     setBusy("google");
     setError(null);
-    setInfo(null);
     try {
       const redirectUrl =
         Platform.OS === "web" ? (window.location.origin + "/") : Linking.createURL("auth");
@@ -102,7 +118,6 @@ export default function Login() {
   const handleGuest = async () => {
     setBusy("guest");
     setError(null);
-    setInfo(null);
     try {
       await signInAsGuest();
       router.replace("/setup");
@@ -114,7 +129,6 @@ export default function Login() {
 
   const handleSubmit = async () => {
     setError(null);
-    setInfo(null);
     const e = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
       setError("Enter a valid email address.");
@@ -138,9 +152,8 @@ export default function Login() {
     try {
       if (mode === "signup") {
         await signUpWithEmail(name.trim(), e, password);
-      } else if (e === ADMIN_EMAIL) {
-        await signInAsAdmin(e, password);
       } else {
+        // Backend decides account type (regular / admin) — no credentials live in the app.
         await signInWithEmail(e, password);
       }
       const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
@@ -151,10 +164,6 @@ export default function Login() {
     }
   };
 
-  const comingSoon = (provider: string) => {
-    setError(null);
-    setInfo(`${provider} login is coming soon. Use Google or email for now.`);
-  };
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
@@ -206,7 +215,6 @@ export default function Login() {
             </Text>
 
             {error ? <Text style={styles.error} testID="login-error">{error}</Text> : null}
-            {info ? <Text style={styles.info} testID="login-info">{info}</Text> : null}
 
             {/* Email / password form */}
             <View style={styles.form}>
@@ -289,7 +297,6 @@ export default function Login() {
                 onPress={() => {
                   setMode(isSignup ? "signin" : "signup");
                   setError(null);
-                  setInfo(null);
                 }}
                 style={styles.switchModeBtn}
                 testID="login-switch-mode"
@@ -300,43 +307,28 @@ export default function Login() {
               </TouchableOpacity>
             </View>
 
-            {/* Social login */}
+            {/* Social login — Google only */}
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>Or continue with</Text>
               <View style={styles.dividerLine} />
             </View>
 
-            <View style={styles.socialRow}>
-              <TouchableOpacity
-                style={[styles.socialBtn, busy === "google" && styles.btnDisabled]}
-                onPress={handleGoogle}
-                disabled={!!busy}
-                testID="login-google-btn"
-              >
-                {busy === "google" ? (
-                  <ActivityIndicator color={COLORS.text} size="small" />
-                ) : (
-                  <Ionicons name="logo-google" size={24} color={COLORS.text} />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.socialBtn}
-                onPress={() => comingSoon("Facebook")}
-                disabled={!!busy}
-                testID="login-facebook-btn"
-              >
-                <Ionicons name="logo-facebook" size={24} color={COLORS.text} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.socialBtn}
-                onPress={() => comingSoon("Apple")}
-                disabled={!!busy}
-                testID="login-apple-btn"
-              >
-                <Ionicons name="logo-apple" size={24} color={COLORS.text} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.googleBtn, busy === "google" && styles.btnDisabled]}
+              onPress={handleGoogle}
+              disabled={!!busy}
+              testID="login-google-btn"
+            >
+              {busy === "google" ? (
+                <ActivityIndicator color={COLORS.text} size="small" />
+              ) : (
+                <>
+                  <GoogleLogo size={20} />
+                  <Text style={styles.googleBtnText}>Continue with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
             {/* Guest */}
             <TouchableOpacity
@@ -386,7 +378,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 34, fontWeight: FONT.black, letterSpacing: -1.5, color: COLORS.text, lineHeight: 38 },
   subtitle: { marginTop: 10, fontSize: 14, lineHeight: 21, color: COLORS.textMuted, fontWeight: FONT.regular },
   error: { marginTop: 14, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13 },
-  info: { marginTop: 14, color: COLORS.text, fontWeight: FONT.bold, fontSize: 13 },
 
   form: {
     marginTop: 20, padding: 16, borderRadius: RADIUS.lg,
@@ -425,13 +416,20 @@ const styles = StyleSheet.create({
   dividerLine: { flex: 1, height: 2, backgroundColor: COLORS.borderSoft },
   dividerText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 0.5 },
 
-  socialRow: { flexDirection: "row", justifyContent: "center", gap: 14, marginTop: 16 },
-  socialBtn: {
-    width: 60, height: 56, borderRadius: RADIUS.md,
-    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surface,
-    alignItems: "center", justifyContent: "center",
+  googleBtn: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.lg,
+    paddingVertical: 15,
     ...SHADOW.brutalSm,
   },
+  googleBtnText: { fontSize: 14, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.3 },
 
   guestBtn: {
     marginTop: 22,

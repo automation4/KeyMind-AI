@@ -39,9 +39,10 @@ MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
 
-# Admin credentials (single-admin app)
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "himthegreat@gmail.com").lower().strip()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "aa$fufm2q")
+# Admin credentials (single-admin app) — provided via backend/.env only,
+# never shipped in the client bundle/APK.
+ADMIN_EMAIL = (os.environ.get("ADMIN_EMAIL") or "").lower().strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or ""
 
 # Password hashing for email/password accounts
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

@@ -261,6 +261,8 @@ export default function WriteScreen() {
         <TouchableOpacity
           style={styles.dropdown}
           onPress={() => setToolPickerOpen(true)}
+          onLongPress={() => setToolPickerOpen(true)}
+          delayLongPress={250}
           disabled={loading}
           testID="tools-dropdown"
         >

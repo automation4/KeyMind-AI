@@ -122,3 +122,9 @@ Known env note: Metro runs in CI mode (no hot reload) — restart expo after fro
 4. **Premium pattern themes**: ThemeContext extended with `pattern` (classic/dots/grid/stripes/waves, persisted). New `PatternBackground`/`PatternSvg` (react-native-svg, newly installed). Settings → "BACKGROUND PATTERN" section with PREMIUM tag; free users see locks → /pricing; applied pattern renders behind all 4 tab screens.
 5. Pricing copy fixed: "All 13 writing tools".
 Testing: iteration_10 — backend 13/13 pytest pass (`/app/backend/tests/test_iter10_auth_and_guest.py`), all frontend flows pass.
+
+## Changelog — 2026-02 (part 4: login polish + creds hardening + animated picker)
+1. Login: Facebook/Apple buttons REMOVED; single full-width "Continue with Google" button with official multicolor G (react-native-svg). Guest button unchanged.
+2. Credentials hardening: ADMIN_EMAIL/ADMIN_PASSWORD moved to /app/backend/.env (single-quoted password due to $); hardcoded defaults removed from server.py; admin email removed from frontend — /api/auth/login routes admin server-side. Verified working.
+3. ToolPickerSheet: custom Animated popup (backdrop fade + spring slide/scale), tap-outside-to-close backdrop, long-press on tools-dropdown also opens picker (delayLongPress 250ms).
+4. PENDING: real direct Google OAuth (replace Emergent-managed) — requires user's Google Cloud OAuth WEB CLIENT ID (+ redirect URI config). Playbook: expo-auth-session (responseType IdToken) + backend google-auth verify_oauth2_token; backend endpoint /api/auth/google {id_token}. Waiting on user credentials.
