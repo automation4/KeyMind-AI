@@ -198,34 +198,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Account details — list rows like Name / Email / Subscription */}
-        <View style={styles.listCard} testID="account-list-card">
-          <View style={styles.listRow}>
-            <Text style={styles.listRowLabel}>Name</Text>
-            <Text style={styles.listRowValue} numberOfLines={1} testID="settings-row-name">
-              {user?.name || "Guest"}
-            </Text>
-          </View>
-          <View style={styles.listDivider} />
-          <View style={styles.listRow}>
-            <Text style={styles.listRowLabel}>Email</Text>
-            <Text style={styles.listRowValue} numberOfLines={1} testID="settings-row-email">
-              {user?.email || "—"}
-            </Text>
-          </View>
-          <View style={styles.listDivider} />
-          <TouchableOpacity
-            style={styles.listRow}
-            onPress={() => router.push("/pricing")}
-            testID="settings-row-subscription"
-          >
-            <Text style={styles.listRowLabel}>Subscription</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <Text style={styles.listRowValue}>{isPremium ? "Premium" : "Basic"}</Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
-            </View>
-          </TouchableOpacity>
-        </View>
+        {/* Account details card removed per user request — name/email already shown above; subscription accessible via premium upsells */}
 
         {/* Usage card (only when daily limit applies, i.e. not ad-free) */}
         {!isPremium && (
