@@ -146,7 +146,7 @@ export default function SettingsScreen() {
     try {
       await Share.share({
         message:
-          "Check out KeyMind AI Keyboard — my AI writing co-pilot for grammar, translation & more! https://keymind.app",
+          "Check out KeyMind AI — my AI writing co-pilot for grammar, translation & more! https://keymind.app",
       });
     } catch {
       // user dismissed or share unsupported — ignore
