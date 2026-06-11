@@ -174,7 +174,15 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.userName} testID="settings-user-name">{user?.name || "Guest"}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <Text style={styles.userName} testID="settings-user-name">{user?.name || "Guest"}</Text>
+              {isPremium && (
+                <View style={styles.premiumGoldPill} testID="settings-premium-badge">
+                  <Ionicons name="star" size={11} color="#3B2A00" />
+                  <Text style={styles.premiumGoldPillText}>PREMIUM</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.userEmail} testID="settings-user-email">{user?.email || "—"}</Text>
             <View style={{ flexDirection: "row", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
               {user?.is_guest && (
@@ -185,13 +193,6 @@ export default function SettingsScreen() {
               {isAdmin && (
                 <View style={[styles.pill, { backgroundColor: COLORS.text }]}>
                   <Text style={[styles.pillText, { color: COLORS.bg }]}>ADMIN</Text>
-                </View>
-              )}
-              {isPremium && !isAdmin && (
-                <View style={[styles.pill, { backgroundColor: COLORS.mint }]}>
-                  <Text style={styles.pillText}>
-                    {user?.premium_source === "admin" ? "AD-FREE" : "PREMIUM"}
-                  </Text>
                 </View>
               )}
             </View>
@@ -536,6 +537,24 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: COLORS.border,
   },
   pillText: { fontSize: 10, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.5 },
+
+  premiumGoldPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1.5,
+    borderColor: "#8A6A00",
+    backgroundColor: "#F5C518",
+  },
+  premiumGoldPillText: {
+    fontSize: 10,
+    fontWeight: FONT.black,
+    color: "#3B2A00",
+    letterSpacing: 0.6,
+  },
 
   usageCard: {
     marginTop: 14, padding: 14, borderRadius: RADIUS.lg,

@@ -171,7 +171,7 @@ export default function Login() {
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <TouchableOpacity
-          activeOpacity={0.85}
+          activeOpacity={1}
           onPress={handleLogoTap}
           style={styles.logoBlock}
           testID="login-logo"
