@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
@@ -46,10 +50,54 @@ const GoogleLogo = ({ size = 22 }: { size?: number }) => (
 );
 
 export default function Login() {
-  const { signInAsGuest, signInWithGoogleIdToken, user, loading } = useAuth();
+  const { signInAsGuest, signInWithGoogleIdToken, signInAsAdmin, user, loading } = useAuth();
   const router = useRouter();
-  const [busy, setBusy] = useState<"google" | "guest" | null>(null);
+  const [busy, setBusy] = useState<"google" | "guest" | "admin" | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Hidden admin: 22 taps on the KeyMind logo → opens a credentials modal.
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminError, setAdminError] = useState<string | null>(null);
+
+  const handleLogoTap = () => {
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    tapCountRef.current += 1;
+    if (tapCountRef.current >= 22) {
+      tapCountRef.current = 0;
+      setAdminError(null);
+      setAdminEmail("");
+      setAdminPassword("");
+      setAdminModalOpen(true);
+      return;
+    }
+    // Reset the counter if the user pauses for more than ~1.5s between taps.
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 1500);
+  };
+
+  const submitAdminLogin = async () => {
+    setAdminError(null);
+    if (!adminEmail.trim() || !adminPassword) {
+      setAdminError("Email and password are required.");
+      return;
+    }
+    setBusy("admin");
+    try {
+      await signInAsAdmin(adminEmail.trim(), adminPassword);
+      setAdminModalOpen(false);
+      const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
+      router.replace(setupDone ? "/(tabs)" : "/setup");
+    } catch (e: any) {
+      setAdminError(e?.detail || e?.message || "Invalid credentials");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // Real Google OAuth — opens the genuine Google account chooser.
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -122,9 +170,14 @@ export default function Login() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <View style={styles.logoBlock} testID="login-logo">
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={handleLogoTap}
+          style={styles.logoBlock}
+          testID="login-logo"
+        >
           <Text style={styles.logoText}>KM</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.body}>
@@ -188,6 +241,78 @@ export default function Login() {
           <Text style={{ fontWeight: FONT.bold }}>Privacy Policy</Text>.
         </Text>
       </View>
+
+      {/* Hidden admin login — triggered by tapping the logo 22 times */}
+      <Modal
+        visible={adminModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAdminModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.modalCard} testID="admin-modal">
+            <View style={styles.modalHeader}>
+              <Ionicons name="shield-checkmark-outline" size={22} color={COLORS.text} />
+              <Text style={styles.modalTitle}>Admin Sign-in</Text>
+              <TouchableOpacity
+                onPress={() => setAdminModalOpen(false)}
+                style={styles.modalClose}
+                testID="admin-modal-close"
+              >
+                <Ionicons name="close" size={20} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>
+              Enter admin credentials to continue.
+            </Text>
+
+            <TextInput
+              value={adminEmail}
+              onChangeText={setAdminEmail}
+              placeholder="Email"
+              placeholderTextColor={COLORS.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              style={styles.input}
+              testID="admin-email-input"
+            />
+            <TextInput
+              value={adminPassword}
+              onChangeText={setAdminPassword}
+              placeholder="Password"
+              placeholderTextColor={COLORS.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+              style={styles.input}
+              testID="admin-password-input"
+            />
+
+            {adminError ? (
+              <Text style={styles.error} testID="admin-modal-error">
+                {adminError}
+              </Text>
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.adminSubmit, busy === "admin" && styles.btnDisabled]}
+              onPress={submitAdminLogin}
+              disabled={busy === "admin"}
+              testID="admin-modal-submit"
+            >
+              {busy === "admin" ? (
+                <ActivityIndicator color={COLORS.onPrimary} />
+              ) : (
+                <Text style={styles.adminSubmitText}>Sign in as Admin</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -255,4 +380,67 @@ const styles = StyleSheet.create({
   guestBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.onPrimary, letterSpacing: 0.2 },
   btnDisabled: { opacity: 0.6 },
   tos: { marginTop: 22, fontSize: 12, color: COLORS.textMuted, textAlign: "center", lineHeight: 18 },
+
+  // Hidden admin modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    padding: 20,
+    ...SHADOW.brutal,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 6,
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: FONT.black,
+    color: COLORS.text,
+    letterSpacing: -0.3,
+  },
+  modalClose: { padding: 4 },
+  modalSubtitle: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginBottom: 14,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: COLORS.borderSoft,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: COLORS.text,
+    backgroundColor: COLORS.bg,
+    marginBottom: 10,
+  },
+  adminSubmit: {
+    marginTop: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.lg,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  adminSubmitText: {
+    fontSize: 15,
+    fontWeight: FONT.bold,
+    color: COLORS.onPrimary,
+    letterSpacing: 0.3,
+  },
 });

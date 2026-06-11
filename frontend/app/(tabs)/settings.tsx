@@ -153,12 +153,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleFeatureRequest = () => {
-    Linking.openURL(
-      "mailto:himthegreat@gmail.com?subject=KeyMind%20Feature%20Request&body=Hi%20KeyMind%20team%2C%0A%0AI%20would%20love%20to%20see%3A%20",
-    ).catch(() => {});
-  };
-
   const handleReview = () => {
     Linking.openURL("https://play.google.com/store/apps/details?id=com.keymind.app").catch(
       () => {},
@@ -524,17 +518,6 @@ export default function SettingsScreen() {
               <Ionicons name="share-outline" size={18} color={COLORS.text} />
             </View>
             <Text style={styles.listRowTitle}>Share KeyMind</Text>
-          </TouchableOpacity>
-          <View style={styles.listDivider} />
-          <TouchableOpacity
-            style={styles.listRow}
-            onPress={handleFeatureRequest}
-            testID="settings-feature-request-btn"
-          >
-            <View style={styles.listIconWrap}>
-              <Ionicons name="bulb-outline" size={18} color={COLORS.text} />
-            </View>
-            <Text style={styles.listRowTitle}>Request a Feature</Text>
           </TouchableOpacity>
           <View style={styles.listDivider} />
           <TouchableOpacity style={styles.listRow} onPress={handleReview} testID="settings-review-btn">

@@ -58,6 +58,11 @@ export const api = {
       method: "POST",
       body: { id_token },
     }),
+  adminLogin: (email: string, password: string) =>
+    request<{ session_token: string; user: any }>("/auth/admin", {
+      method: "POST",
+      body: { email, password },
+    }),
   me: () => request<{ user: any }>("/auth/me", { auth: true }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST", auth: true }),
 
