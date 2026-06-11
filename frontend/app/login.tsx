@@ -75,6 +75,15 @@ export default function Login() {
 
   const handleGoogle = async () => {
     setError(null);
+    // On Android, if no dedicated Android Client ID is configured, the Web client
+    // will fail with "Custom scheme URIs are not allowed for WEB client type".
+    // Detect that up-front and show a friendly message instead of opening Google.
+    if (Platform.OS === "android" && !GOOGLE_ANDROID_CLIENT_ID) {
+      setError(
+        "Google sign-in isn't enabled for Android yet. Please continue as Guest, or use the 22-tap admin login.",
+      );
+      return;
+    }
     if (!googleRequest) {
       setError("Google sign-in is not ready yet — please wait a moment.");
       return;
@@ -210,8 +219,22 @@ export default function Login() {
 
         <Text style={styles.tos}>
           By continuing you agree to our{"\n"}
-          <Text style={{ fontWeight: FONT.bold }}>Terms of Service</Text> and{" "}
-          <Text style={{ fontWeight: FONT.bold }}>Privacy Policy</Text>.
+          <Text
+            style={styles.tosLink}
+            onPress={() => router.push("/terms")}
+            testID="login-tos-link"
+          >
+            Terms of Service
+          </Text>{" "}
+          and{" "}
+          <Text
+            style={styles.tosLink}
+            onPress={() => router.push("/privacy")}
+            testID="login-privacy-link"
+          >
+            Privacy Policy
+          </Text>
+          .
         </Text>
       </View>
 
@@ -353,6 +376,11 @@ const styles = StyleSheet.create({
 
   btnDisabled: { opacity: 0.6 },
   tos: { marginTop: 22, fontSize: 12, color: COLORS.textMuted, textAlign: "center", lineHeight: 18 },
+  tosLink: {
+    fontWeight: FONT.bold,
+    color: COLORS.text,
+    textDecorationLine: "underline",
+  },
 
   // Hidden admin modal
   modalBackdrop: {

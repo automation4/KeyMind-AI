@@ -504,6 +504,30 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.listRowTitle}>Review on the Play Store</Text>
           </TouchableOpacity>
+          <View style={styles.listDivider} />
+          <TouchableOpacity
+            style={styles.listRow}
+            onPress={() => router.push("/terms")}
+            testID="settings-terms-btn"
+          >
+            <View style={styles.listIconWrap}>
+              <Ionicons name="document-text-outline" size={18} color={COLORS.text} />
+            </View>
+            <Text style={styles.listRowTitle}>Terms of Service</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+          </TouchableOpacity>
+          <View style={styles.listDivider} />
+          <TouchableOpacity
+            style={styles.listRow}
+            onPress={() => router.push("/privacy")}
+            testID="settings-privacy-btn"
+          >
+            <View style={styles.listIconWrap}>
+              <Ionicons name="lock-closed-outline" size={18} color={COLORS.text} />
+            </View>
+            <Text style={styles.listRowTitle}>Privacy Policy</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+          </TouchableOpacity>
         </View>
 
         {/* Logout */}
