@@ -51,6 +51,14 @@ const SLIDES: Slide[] = [
     fallbackIcon: "mic",
   },
   {
+    title: "Speak\nLike a Native",
+    subtitle:
+      "Learning a new language has never been easier. Get native-sounding phrases, real-time translation & pronunciation help in 20+ tongues.",
+    lottie: require("@/src/assets/lottie/globe.json"),
+    bg: COLORS.lilac,
+    fallbackIcon: "chatbubbles",
+  },
+  {
     title: "Ready to\nTake Off?",
     subtitle:
       "13 AI tools — grammar, paraphrase, translate, idioms, vocab & dictation. Let’s go!",
