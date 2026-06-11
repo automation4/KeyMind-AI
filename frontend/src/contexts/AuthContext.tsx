@@ -24,6 +24,7 @@ type AuthState = {
   signInWithSessionId: (session_id: string) => Promise<void>;
   signInAsGuest: () => Promise<void>;
   signInAsAdmin: (email: string, password: string) => Promise<void>;
+  signInWithGoogleIdToken: (id_token: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -77,6 +78,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser({ ...(data.user as User), is_guest: true });
   };
 
+  const signInWithGoogleIdToken = async (id_token: string) => {
+    const data = await api.googleLogin(id_token);
+    await setToken(data.session_token);
+    setUser(data.user as User);
+  };
+
   const signInWithEmail = async (email: string, password: string) => {
     const data = await api.emailLogin(email, password);
     await setToken(data.session_token);
@@ -112,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInWithSessionId, signInAsGuest, signInAsAdmin, signInWithEmail, signUpWithEmail, signOut, refreshUser }}
+      value={{ user, loading, signInWithSessionId, signInAsGuest, signInAsAdmin, signInWithGoogleIdToken, signInWithEmail, signUpWithEmail, signOut, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

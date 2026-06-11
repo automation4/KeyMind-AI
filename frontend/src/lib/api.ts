@@ -68,6 +68,11 @@ export const api = {
       method: "POST",
       body: { email, password },
     }),
+  googleLogin: (id_token: string) =>
+    request<{ session_token: string; user: any }>("/auth/google", {
+      method: "POST",
+      body: { id_token },
+    }),
   adminLogin: (email: string, password: string) =>
     request<{ session_token: string; user: any }>("/auth/admin", {
       method: "POST",

@@ -95,6 +95,10 @@ class EmailLoginRequest(BaseModel):
     password: str
 
 
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+
 class AIToolRequest(BaseModel):
     tool: str
     text: str
@@ -370,6 +374,65 @@ async def create_session(body: SessionCreate):
     user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     user_doc = await _ensure_whitelist_sync(user_doc)
     return {"session_token": session_token, "user": _user_public(user_doc)}
+
+
+@api.post("/auth/google")
+async def google_login(body: GoogleAuthRequest):
+    """Direct Google Sign-In: verify a Google ID token and issue a session."""
+    client_id = os.environ.get("GOOGLE_CLIENT_ID") or ""
+    if not client_id:
+        raise HTTPException(status_code=500, detail="Google sign-in is not configured")
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+
+        claims = google_id_token.verify_oauth2_token(
+            body.id_token, google_requests.Request(), client_id
+        )
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+
+    email = (claims.get("email") or "").lower().strip()
+    if not email or not claims.get("email_verified", False):
+        raise HTTPException(status_code=401, detail="Google account email not verified")
+    name = claims.get("name") or email
+    picture = claims.get("picture")
+
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        user_id = existing["user_id"]
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"name": name, "picture": picture, "last_login": datetime.now(timezone.utc).isoformat()}},
+        )
+    else:
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        await db.users.insert_one(
+            {
+                "user_id": user_id,
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "is_guest": False,
+                "is_admin": email == ADMIN_EMAIL,
+                "is_premium": email == ADMIN_EMAIL,
+                "auth_provider": "google",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+    token = uuid.uuid4().hex
+    await db.user_sessions.insert_one(
+        {
+            "session_token": token,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(days=30),
+        }
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    user_doc = await _ensure_whitelist_sync(user_doc)
+    return {"session_token": token, "user": _user_public(user_doc)}
 
 
 @api.post("/auth/guest")

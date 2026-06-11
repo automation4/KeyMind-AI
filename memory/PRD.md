@@ -128,3 +128,12 @@ Testing: iteration_10 — backend 13/13 pytest pass (`/app/backend/tests/test_it
 2. Credentials hardening: ADMIN_EMAIL/ADMIN_PASSWORD moved to /app/backend/.env (single-quoted password due to $); hardcoded defaults removed from server.py; admin email removed from frontend — /api/auth/login routes admin server-side. Verified working.
 3. ToolPickerSheet: custom Animated popup (backdrop fade + spring slide/scale), tap-outside-to-close backdrop, long-press on tools-dropdown also opens picker (delayLongPress 250ms).
 4. PENDING: real direct Google OAuth (replace Emergent-managed) — requires user's Google Cloud OAuth WEB CLIENT ID (+ redirect URI config). Playbook: expo-auth-session (responseType IdToken) + backend google-auth verify_oauth2_token; backend endpoint /api/auth/google {id_token}. Waiting on user credentials.
+
+## Changelog — 2026-02 (part 5: real Google OAuth)
+- Replaced Emergent-managed Google auth with DIRECT Google OAuth:
+  - Frontend: expo-auth-session (+expo-crypto) `Google.useIdTokenAuthRequest` with EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (frontend/.env). Opens genuine accounts.google.com (verified via popup URL check).
+  - Backend: POST /api/auth/google {id_token} → google-auth verify_oauth2_token against GOOGLE_CLIENT_ID (backend/.env) → upsert user by email → session token.
+  - Emergent /auth/session endpoint + signInWithSessionId remain in code (unused by login UI now).
+- Client ID: 241457285059-0f2oc6cvu40uakmp61dejr9ac5vifvdm.apps.googleusercontent.com (user-provided, Web type).
+- CAVEATS: (1) Full login needs the user's Google account; if OAuth consent screen is in Testing mode, the Google account must be added as test user. (2) On native Expo Go preview, web-client flows may fail — works on web preview; APK build will need an Android client ID (package name + SHA-1). (3) Preview URL must be in Authorized JavaScript origins + redirect URIs in Google Console.
+- Regression: email login, guest device reuse re-verified post-change.

@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
+import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
@@ -46,8 +46,8 @@ const GoogleLogo = ({ size = 20 }: { size?: number }) => (
 
 export default function Login() {
   const {
-    signInWithSessionId,
     signInAsGuest,
+    signInWithGoogleIdToken,
     signInWithEmail,
     signUpWithEmail,
     user,
@@ -62,6 +62,43 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Real Google OAuth — opens the genuine Google account chooser.
+  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const [googleRequest, googleResponse, promptGoogle] = Google.useIdTokenAuthRequest({
+    clientId: googleClientId,
+    webClientId: googleClientId,
+  });
+
+  useEffect(() => {
+    if (!googleResponse) return;
+    if (googleResponse.type === "success") {
+      const idToken =
+        (googleResponse.params as any)?.id_token ||
+        (googleResponse as any)?.authentication?.idToken;
+      if (!idToken) {
+        setError("Google did not return a token. Please try again.");
+        setBusy(null);
+        return;
+      }
+      signInWithGoogleIdToken(idToken)
+        .then(async () => {
+          const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
+          router.replace(setupDone ? "/(tabs)" : "/setup");
+        })
+        .catch((e: any) => {
+          setError(e?.detail || e?.message || "Google sign-in failed");
+          setBusy(null);
+        });
+    } else if (googleResponse.type === "error") {
+      setError(googleResponse.error?.message || "Google sign-in failed");
+      setBusy(null);
+    } else {
+      // dismissed / cancelled
+      setBusy(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleResponse]);
+
   useEffect(() => {
     if (loading || !user || busy) return;
     (async () => {
@@ -70,47 +107,13 @@ export default function Login() {
     })();
   }, [loading, user, busy, router]);
 
-  const parseSessionId = (url: string): string | null => {
-    try {
-      const hashIdx = url.indexOf("#");
-      const hash = hashIdx >= 0 ? url.substring(hashIdx + 1) : "";
-      const qIdx = url.indexOf("?");
-      const q = qIdx >= 0 ? url.substring(qIdx + 1, hashIdx >= 0 ? hashIdx : undefined) : "";
-      const params = new URLSearchParams(hash || q);
-      return params.get("session_id");
-    } catch {
-      return null;
-    }
-  };
-
   const handleGoogle = async () => {
-    setBusy("google");
     setError(null);
+    setBusy("google");
     try {
-      const redirectUrl =
-        Platform.OS === "web" ? (window.location.origin + "/") : Linking.createURL("auth");
-      const authUrl = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-
-      if (Platform.OS === "web") {
-        window.location.href = authUrl;
-        return;
-      }
-
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-      if (result.type !== "success" || !result.url) {
-        setBusy(null);
-        return;
-      }
-      const sid = parseSessionId(result.url);
-      if (!sid) {
-        setError("Could not retrieve session. Please try again.");
-        setBusy(null);
-        return;
-      }
-      await signInWithSessionId(sid);
-      router.replace("/setup");
+      await promptGoogle();
     } catch (e: any) {
-      setError(e?.message || "Sign-in failed");
+      setError(e?.message || "Google sign-in failed");
       setBusy(null);
     }
   };
@@ -163,27 +166,6 @@ export default function Login() {
       setBusy(null);
     }
   };
-
-
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const sid = parseSessionId(url);
-    if (sid) {
-      setBusy("google");
-      signInWithSessionId(sid)
-        .then(() => {
-          if (typeof window !== "undefined") {
-            window.history.replaceState(null, "", window.location.pathname);
-          }
-          router.replace("/setup");
-        })
-        .catch((e) => {
-          setError(e?.message || "Sign-in failed");
-          setBusy(null);
-        });
-    }
-  }, []);
 
   const isSignup = mode === "signup";
 
@@ -315,9 +297,9 @@ export default function Login() {
             </View>
 
             <TouchableOpacity
-              style={[styles.googleBtn, busy === "google" && styles.btnDisabled]}
+              style={[styles.googleBtn, (busy === "google" || !googleRequest) && styles.btnDisabled]}
               onPress={handleGoogle}
-              disabled={!!busy}
+              disabled={!!busy || !googleRequest}
               testID="login-google-btn"
             >
               {busy === "google" ? (
