@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -13,16 +13,93 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import Svg, { Path } from "react-native-svg";
 
 import { useAuth } from "@/src/contexts/AuthContext";
 import { storage } from "@/src/utils/storage";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+
+const GoogleLogo: React.FC<{ size?: number }> = ({ size = 22 }) => (
+  <Svg width={size} height={size} viewBox="0 0 48 48">
+    <Path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303a12 12 0 1 1-3.42-13.05l5.657-5.657A20 20 0 1 0 44 24c0-1.341-.138-2.65-.389-3.917z" />
+    <Path fill="#FF3D00" d="m6.306 14.691 6.571 4.819A12 12 0 0 1 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657A19.9 19.9 0 0 0 24 4 19.99 19.99 0 0 0 6.306 14.691z" />
+    <Path fill="#4CAF50" d="M24 44a19.9 19.9 0 0 0 13.409-5.192l-6.19-5.238A12 12 0 0 1 12.65 28.057l-6.522 5.025A19.99 19.99 0 0 0 24 44z" />
+    <Path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l6.19 5.238A19.94 19.94 0 0 0 44 24c0-1.341-.138-2.65-.389-3.917z" />
+  </Svg>
+);
+
 export default function Login() {
-  const { signInAsGuest, signInAsAdmin } = useAuth();
+  const { signInAsGuest, signInWithGoogleIdToken, signInAsAdmin } = useAuth();
   const router = useRouter();
-  const [busy, setBusy] = useState<"guest" | "admin" | null>(null);
+  const [busy, setBusy] = useState<"google" | "guest" | "admin" | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Google OAuth (real, with your own client IDs — no Emergent branding).
+  const [googleRequest, googleResponse, promptGoogle] = Google.useIdTokenAuthRequest({
+    clientId: GOOGLE_WEB_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_IOS_CLIENT_ID || GOOGLE_WEB_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    const handle = async () => {
+      if (googleResponse?.type !== "success") return;
+      const idToken = (googleResponse as any).params?.id_token;
+      if (!idToken) {
+        setError("Google did not return an ID token.");
+        return;
+      }
+      setBusy("google");
+      try {
+        await signInWithGoogleIdToken(idToken);
+        const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
+        router.replace(setupDone ? "/(tabs)" : "/setup");
+      } catch (e: any) {
+        setError(e?.detail || e?.message || "Google sign-in failed.");
+      } finally {
+        setBusy(null);
+      }
+    };
+    handle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleResponse]);
+
+  const handleGoogle = async () => {
+    setError(null);
+    if (!googleRequest) {
+      setError("Google sign-in is not ready yet — please wait a moment.");
+      return;
+    }
+    setBusy("google");
+    try {
+      await promptGoogle();
+    } catch (e: any) {
+      setError(e?.message || "Could not start Google sign-in.");
+    } finally {
+      setBusy((b) => (b === "google" ? null : b));
+    }
+  };
+
+  const handleGuest = async () => {
+    setBusy("guest");
+    setError(null);
+    try {
+      await signInAsGuest();
+      router.replace("/setup");
+    } catch (e: any) {
+      setError(e?.message || "Guest sign-in failed");
+      setBusy(null);
+    }
+  };
 
   // Hidden admin: 22 taps on the KeyMind logo → opens a credentials modal.
   const tapCountRef = useRef(0);
@@ -43,7 +120,6 @@ export default function Login() {
       setAdminModalOpen(true);
       return;
     }
-    // Reset the counter if the user pauses for more than ~1.5s between taps.
     tapTimerRef.current = setTimeout(() => {
       tapCountRef.current = 0;
     }, 1500);
@@ -64,28 +140,6 @@ export default function Login() {
     } catch (e: any) {
       setAdminError(e?.detail || e?.message || "Invalid credentials");
     } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleSignup = () => {
-    setError(null);
-    router.push({ pathname: "/email-auth", params: { mode: "signup" } });
-  };
-
-  const handleSignin = () => {
-    setError(null);
-    router.push({ pathname: "/email-auth", params: { mode: "signin" } });
-  };
-
-  const handleGuest = async () => {
-    setBusy("guest");
-    setError(null);
-    try {
-      await signInAsGuest();
-      router.replace("/setup");
-    } catch (e: any) {
-      setError(e?.message || "Guest sign-in failed");
       setBusy(null);
     }
   };
@@ -114,26 +168,21 @@ export default function Login() {
 
         <View style={{ flex: 1 }} />
 
-        {/* Primary CTA — Sign up (create new Gmail account) */}
+        {/* Primary CTA — Continue with Google (own OAuth, no Emergent branding) */}
         <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={handleSignup}
-          disabled={!!busy}
-          testID="login-signup-btn"
+          style={[styles.googleBtn, (busy === "google" || !googleRequest) && styles.btnDisabled]}
+          onPress={handleGoogle}
+          disabled={!!busy || !googleRequest}
+          testID="login-google-btn"
         >
-          <Ionicons name="person-add-outline" size={20} color={COLORS.onPrimary} />
-          <Text style={styles.primaryBtnText}>Sign up</Text>
-        </TouchableOpacity>
-
-        {/* Sign in — existing accounts */}
-        <TouchableOpacity
-          style={styles.outlineBtn}
-          onPress={handleSignin}
-          disabled={!!busy}
-          testID="login-signin-btn"
-        >
-          <Ionicons name="log-in-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.outlineBtnText}>Sign in</Text>
+          {busy === "google" ? (
+            <ActivityIndicator color={COLORS.text} size="small" />
+          ) : (
+            <>
+              <GoogleLogo size={22} />
+              <Text style={styles.googleBtnText}>Continue with Google</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         <View style={styles.dividerRow}>
@@ -144,17 +193,17 @@ export default function Login() {
 
         {/* Secondary — Guest */}
         <TouchableOpacity
-          style={[styles.secondaryBtn, busy === "guest" && styles.btnDisabled]}
+          style={[styles.guestBtn, busy === "guest" && styles.btnDisabled]}
           onPress={handleGuest}
           disabled={!!busy}
           testID="login-guest-btn"
         >
           {busy === "guest" ? (
-            <ActivityIndicator color={COLORS.text} />
+            <ActivityIndicator color={COLORS.onPrimary} />
           ) : (
             <>
-              <Ionicons name="person-outline" size={18} color={COLORS.text} />
-              <Text style={styles.secondaryBtnText}>Continue as Guest</Text>
+              <Ionicons name="person-outline" size={18} color={COLORS.onPrimary} />
+              <Text style={styles.guestBtnText}>Continue as Guest</Text>
             </>
           )}
         </TouchableOpacity>
@@ -267,64 +316,39 @@ const styles = StyleSheet.create({
   },
   error: { marginTop: 16, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13, textAlign: "center" },
 
-  // Primary CTA (Continue with Email) — accent-filled
-  primaryBtn: {
+  // Google sign-in — white/surface with subtle border
+  googleBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.lg,
-    paddingVertical: 16,
-  },
-  primaryBtnText: {
-    fontSize: 15,
-    fontWeight: FONT.bold,
-    color: COLORS.onPrimary,
-    letterSpacing: 0.3,
-  },
-
-  // Outlined CTA (Sign in) — clearly secondary but still tappable
-  outlineBtn: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: COLORS.surface,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    borderRadius: RADIUS.lg,
-    paddingVertical: 14,
-  },
-  outlineBtnText: {
-    fontSize: 15,
-    fontWeight: FONT.bold,
-    color: COLORS.primary,
-    letterSpacing: 0.3,
-  },
-
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 18 },
-  dividerLine: { flex: 1, height: 1.5, backgroundColor: COLORS.borderSoft },
-  dividerText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 2 },
-
-  // Secondary (Guest) — outlined surface
-  secondaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    gap: 12,
     backgroundColor: COLORS.surface,
     borderWidth: 1.5,
     borderColor: COLORS.border,
     borderRadius: RADIUS.lg,
     paddingVertical: 16,
   },
-  secondaryBtnText: {
+  googleBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.text, letterSpacing: 0.2 },
+
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 18 },
+  dividerLine: { flex: 1, height: 1.5, backgroundColor: COLORS.borderSoft },
+  dividerText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 2 },
+
+  // Guest — primary filled (so it's still discoverable since Google needs a config)
+  guestBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.lg,
+    paddingVertical: 16,
+  },
+  guestBtnText: {
     fontSize: 15,
-    fontWeight: FONT.semi,
-    color: COLORS.text,
-    letterSpacing: 0.2,
+    fontWeight: FONT.bold,
+    color: COLORS.onPrimary,
+    letterSpacing: 0.3,
   },
 
   btnDisabled: { opacity: 0.6 },
