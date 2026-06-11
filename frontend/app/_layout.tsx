@@ -3,6 +3,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider } from "@/src/contexts/AuthContext";
@@ -29,12 +30,14 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
-        </AuthProvider>
-      </ThemeProvider>
+      <KeyboardProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <StatusBar style="dark" />
+            <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
+          </AuthProvider>
+        </ThemeProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }

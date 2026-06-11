@@ -58,6 +58,16 @@ export const api = {
       method: "POST",
       body: { id_token },
     }),
+  emailRegister: (email: string, password: string, name?: string) =>
+    request<{ session_token: string; user: any }>("/auth/register", {
+      method: "POST",
+      body: { email, password, name },
+    }),
+  emailLogin: (email: string, password: string) =>
+    request<{ session_token: string; user: any }>("/auth/login", {
+      method: "POST",
+      body: { email, password },
+    }),
   adminLogin: (email: string, password: string) =>
     request<{ session_token: string; user: any }>("/auth/admin", {
       method: "POST",

@@ -191,7 +191,7 @@ export default function Login() {
 
         <View style={{ flex: 1 }} />
 
-        {/* Google sign-in — the only account login */}
+        {/* Google sign-in — works on web preview / iOS */}
         <TouchableOpacity
           style={[styles.googleBtn, (busy === "google" || !googleRequest) && styles.btnDisabled]}
           onPress={handleGoogle}
@@ -206,6 +206,17 @@ export default function Login() {
               <Text style={styles.googleBtnText}>Continue with Google</Text>
             </>
           )}
+        </TouchableOpacity>
+
+        {/* Manual Gmail account (no Google OAuth — works everywhere) */}
+        <TouchableOpacity
+          style={styles.emailBtn}
+          onPress={() => router.push("/email-auth")}
+          disabled={!!busy}
+          testID="login-email-btn"
+        >
+          <Ionicons name="mail-outline" size={20} color={COLORS.text} />
+          <Text style={styles.emailBtnText}>Continue with Email</Text>
         </TouchableOpacity>
 
         <View style={styles.dividerRow}>
@@ -359,6 +370,20 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   googleBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.text, letterSpacing: 0.2 },
+
+  emailBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.lg,
+    paddingVertical: 16,
+    marginTop: 12,
+  },
+  emailBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.text, letterSpacing: 0.2 },
 
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 18 },
   dividerLine: { flex: 1, height: 1.5, backgroundColor: COLORS.borderSoft },

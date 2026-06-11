@@ -89,6 +89,12 @@ class EmailLoginRequest(BaseModel):
     password: str
 
 
+class EmailRegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+
 class GoogleAuthRequest(BaseModel):
     id_token: str
 
@@ -489,6 +495,64 @@ async def email_login(body: EmailLoginRequest):
     await db.users.update_one(
         {"user_id": user_id},
         {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}},
+    )
+    token = uuid.uuid4().hex
+    await db.user_sessions.insert_one(
+        {
+            "session_token": token,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(days=30),
+        }
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    user_doc = await _ensure_whitelist_sync(user_doc)
+    return {"session_token": token, "user": _user_public(user_doc)}
+
+
+# Manual sign-up — restricted to Gmail addresses only.
+GMAIL_RE = re.compile(r"^[a-z0-9._%+-]+@gmail\.com$", re.IGNORECASE)
+
+
+@api.post("/auth/register")
+async def email_register(body: EmailRegisterRequest):
+    email = (body.email or "").lower().strip()
+    password = body.password or ""
+    name = (body.name or "").strip() or email.split("@", 1)[0]
+
+    # Gmail-only validation (case-insensitive).
+    if not GMAIL_RE.match(email):
+        raise HTTPException(
+            status_code=400,
+            detail="Only Gmail addresses are allowed (must end with @gmail.com).",
+        )
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+    if email == ADMIN_EMAIL:
+        # Don't let anyone register the configured admin email through this path.
+        raise HTTPException(status_code=400, detail="This email is reserved.")
+
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=409, detail="An account already exists for this email. Try signing in instead.")
+
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    password_hash = pwd_context.hash(password)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.insert_one(
+        {
+            "user_id": user_id,
+            "email": email,
+            "name": name,
+            "picture": None,
+            "is_guest": False,
+            "is_admin": False,
+            "is_premium": False,
+            "password_hash": password_hash,
+            "auth_provider": "email",
+            "created_at": now_iso,
+            "last_login": now_iso,
+        }
     )
     token = uuid.uuid4().hex
     await db.user_sessions.insert_one(

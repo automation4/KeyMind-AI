@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   TextInput,
   ActivityIndicator,
   Alert,
@@ -16,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { useAuth } from "@/src/contexts/AuthContext";
@@ -162,7 +162,11 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <PatternBackground />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        bottomOffset={24}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.eyebrow}>YOU</Text>
         <Text style={styles.title}>Settings.</Text>
 
@@ -512,7 +516,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         <Text style={styles.footer}>KeyMind AI · v1.0 · Built for writers everywhere.</Text>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

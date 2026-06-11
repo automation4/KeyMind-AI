@@ -6,12 +6,12 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
@@ -183,7 +183,7 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "translate-with-padding"}
         keyboardVerticalOffset={80}
       >
         <ScrollView
