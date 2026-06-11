@@ -90,6 +90,7 @@ export type User = {
 type AuthState = {
   user: User | null;
   loading: boolean;
+  deviceId: string | null;
   signInAsGuest: () => Promise<void>;
   signInWithGoogleIdToken: (id_token: string) => Promise<void>;
   signInAsAdmin: (email: string, password: string) => Promise<void>;
@@ -104,6 +105,15 @@ const AuthContext = createContext<AuthState | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+
+  // Resolve & cache device id once on mount — surfaced via context for diagnostics.
+  useEffect(() => {
+    (async () => {
+      const id = await getStableDeviceId();
+      setDeviceId(id);
+    })();
+  }, []);
 
   const refresh = useCallback(async () => {
     const token = await getToken();
@@ -178,7 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInAsGuest, signInWithGoogleIdToken, signInAsAdmin, signInWithEmail, registerWithEmail, signOut, refreshUser }}
+      value={{ user, loading, deviceId, signInAsGuest, signInWithGoogleIdToken, signInAsAdmin, signInWithEmail, registerWithEmail, signOut, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

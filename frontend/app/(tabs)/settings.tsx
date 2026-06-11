@@ -46,7 +46,7 @@ type WhitelistEntry = {
 };
 
 export default function SettingsScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, deviceId } = useAuth();
   const { mode, accent, customAccent, pattern, setMode, setAccent, setCustomAccent, setPattern, accentColor } = useTheme();
   const router = useRouter();
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
@@ -530,6 +530,36 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Diagnostics — admin only. Useful for verifying the stable device id
+            we send to the backend for guest-user persistence across reinstalls. */}
+        {isAdmin && (
+          <View style={styles.diagCard} testID="settings-diag-card">
+            <Text style={styles.diagTitle}>DIAGNOSTICS</Text>
+            <Text style={styles.diagLabel}>Device ID</Text>
+            <TouchableOpacity
+              onPress={async () => {
+                if (!deviceId) return;
+                try {
+                  const ClipMod = await import("expo-clipboard");
+                  await ClipMod.setStringAsync(deviceId);
+                  if (Platform.OS === "android") {
+                    const { ToastAndroid } = await import("react-native");
+                    ToastAndroid.show("Device ID copied", ToastAndroid.SHORT);
+                  } else {
+                    Alert.alert("Device ID", "Copied to clipboard");
+                  }
+                } catch {}
+              }}
+              testID="settings-device-id-copy"
+            >
+              <Text style={styles.diagValue} numberOfLines={1}>
+                {deviceId || "(resolving…)"}
+              </Text>
+              <Text style={styles.diagHint}>Tap to copy</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={async () => {
           await signOut();
@@ -547,6 +577,34 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
+  diagCard: {
+    marginTop: 20,
+    padding: 14,
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  diagTitle: {
+    fontSize: 11,
+    fontWeight: FONT.black,
+    letterSpacing: 1.4,
+    color: COLORS.textMuted,
+    marginBottom: 8,
+  },
+  diagLabel: {
+    fontSize: 11,
+    fontWeight: FONT.black,
+    letterSpacing: 0.8,
+    color: COLORS.textMuted,
+  },
+  diagValue: {
+    marginTop: 4,
+    fontSize: 12,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }),
+    color: COLORS.text,
+  },
+  diagHint: { marginTop: 4, fontSize: 11, color: COLORS.textMuted },
   eyebrow: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
   title: { marginTop: 4, fontSize: 32, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -1.2 },
   card: {
