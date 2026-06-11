@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -11,48 +11,17 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import Svg, { Path } from "react-native-svg";
 
 import { useAuth } from "@/src/contexts/AuthContext";
 import { storage } from "@/src/utils/storage";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
-try {
-  WebBrowser.maybeCompleteAuthSession();
-} catch {
-  // Running inside a cross-origin iframe (e.g. the Emergent preview) —
-  // window.opener/location access is blocked there. Safe to ignore.
-}
-
-const GoogleLogo = ({ size = 22 }: { size?: number }) => (
-  <Svg width={size} height={size} viewBox="0 0 48 48">
-    <Path
-      fill="#EA4335"
-      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-    />
-    <Path
-      fill="#4285F4"
-      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-    />
-    <Path
-      fill="#FBBC05"
-      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-    />
-    <Path
-      fill="#34A853"
-      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-    />
-  </Svg>
-);
-
 export default function Login() {
-  const { signInAsGuest, signInWithGoogleIdToken, signInAsAdmin, user, loading } = useAuth();
+  const { signInAsGuest, signInAsAdmin } = useAuth();
   const router = useRouter();
-  const [busy, setBusy] = useState<"google" | "guest" | "admin" | null>(null);
+  const [busy, setBusy] = useState<"guest" | "admin" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Hidden admin: 22 taps on the KeyMind logo → opens a credentials modal.
@@ -99,60 +68,14 @@ export default function Login() {
     }
   };
 
-  // Real Google OAuth — opens the genuine Google account chooser.
-  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-  const [googleRequest, googleResponse, promptGoogle] = Google.useIdTokenAuthRequest({
-    clientId: googleClientId,
-    webClientId: googleClientId,
-  });
-
-  useEffect(() => {
-    if (!googleResponse) return;
-    if (googleResponse.type === "success") {
-      const idToken =
-        (googleResponse.params as any)?.id_token ||
-        (googleResponse as any)?.authentication?.idToken;
-      if (!idToken) {
-        setError("Google did not return a token. Please try again.");
-        setBusy(null);
-        return;
-      }
-      signInWithGoogleIdToken(idToken)
-        .then(async () => {
-          const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
-          router.replace(setupDone ? "/(tabs)" : "/setup");
-        })
-        .catch((e: any) => {
-          setError(e?.detail || e?.message || "Google sign-in failed");
-          setBusy(null);
-        });
-    } else if (googleResponse.type === "error") {
-      setError(googleResponse.error?.message || "Google sign-in failed");
-      setBusy(null);
-    } else {
-      // dismissed / cancelled
-      setBusy(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleResponse]);
-
-  useEffect(() => {
-    if (loading || !user || busy) return;
-    (async () => {
-      const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
-      router.replace(setupDone ? "/(tabs)" : "/setup");
-    })();
-  }, [loading, user, busy, router]);
-
-  const handleGoogle = async () => {
+  const handleSignup = () => {
     setError(null);
-    setBusy("google");
-    try {
-      await promptGoogle();
-    } catch (e: any) {
-      setError(e?.message || "Google sign-in failed");
-      setBusy(null);
-    }
+    router.push({ pathname: "/email-auth", params: { mode: "signup" } });
+  };
+
+  const handleSignin = () => {
+    setError(null);
+    router.push({ pathname: "/email-auth", params: { mode: "signin" } });
   };
 
   const handleGuest = async () => {
@@ -191,32 +114,26 @@ export default function Login() {
 
         <View style={{ flex: 1 }} />
 
-        {/* Google sign-in — works on web preview / iOS */}
+        {/* Primary CTA — Sign up (create new Gmail account) */}
         <TouchableOpacity
-          style={[styles.googleBtn, (busy === "google" || !googleRequest) && styles.btnDisabled]}
-          onPress={handleGoogle}
-          disabled={!!busy || !googleRequest}
-          testID="login-google-btn"
+          style={styles.primaryBtn}
+          onPress={handleSignup}
+          disabled={!!busy}
+          testID="login-signup-btn"
         >
-          {busy === "google" ? (
-            <ActivityIndicator color={COLORS.text} size="small" />
-          ) : (
-            <>
-              <GoogleLogo size={22} />
-              <Text style={styles.googleBtnText}>Continue with Google</Text>
-            </>
-          )}
+          <Ionicons name="person-add-outline" size={20} color={COLORS.onPrimary} />
+          <Text style={styles.primaryBtnText}>Sign up</Text>
         </TouchableOpacity>
 
-        {/* Manual Gmail account (no Google OAuth — works everywhere) */}
+        {/* Sign in — existing accounts */}
         <TouchableOpacity
-          style={styles.emailBtn}
-          onPress={() => router.push("/email-auth")}
+          style={styles.outlineBtn}
+          onPress={handleSignin}
           disabled={!!busy}
-          testID="login-email-btn"
+          testID="login-signin-btn"
         >
-          <Ionicons name="mail-outline" size={20} color={COLORS.text} />
-          <Text style={styles.emailBtnText}>Continue with Email</Text>
+          <Ionicons name="log-in-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.outlineBtnText}>Sign in</Text>
         </TouchableOpacity>
 
         <View style={styles.dividerRow}>
@@ -225,19 +142,19 @@ export default function Login() {
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Guest */}
+        {/* Secondary — Guest */}
         <TouchableOpacity
-          style={[styles.guestBtn, busy === "guest" && styles.btnDisabled]}
+          style={[styles.secondaryBtn, busy === "guest" && styles.btnDisabled]}
           onPress={handleGuest}
           disabled={!!busy}
           testID="login-guest-btn"
         >
           {busy === "guest" ? (
-            <ActivityIndicator color={COLORS.onPrimary} />
+            <ActivityIndicator color={COLORS.text} />
           ) : (
             <>
-              <Ionicons name="person-outline" size={18} color={COLORS.onPrimary} />
-              <Text style={styles.guestBtnText}>Continue as Guest</Text>
+              <Ionicons name="person-outline" size={18} color={COLORS.text} />
+              <Text style={styles.secondaryBtnText}>Continue as Guest</Text>
             </>
           )}
         </TouchableOpacity>
@@ -348,57 +265,68 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     textAlign: "center",
   },
-  subtitle: {
-    marginTop: 12,
-    fontSize: 14,
-    lineHeight: 21,
-    color: COLORS.textMuted,
-    fontWeight: FONT.regular,
-    textAlign: "center",
-  },
   error: { marginTop: 16, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13, textAlign: "center" },
 
-  googleBtn: {
+  // Primary CTA (Continue with Email) — accent-filled
+  primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1.5,
-    borderColor: "#A5B4FC",
+    gap: 10,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.lg,
     paddingVertical: 16,
   },
-  googleBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.text, letterSpacing: 0.2 },
+  primaryBtnText: {
+    fontSize: 15,
+    fontWeight: FONT.bold,
+    color: COLORS.onPrimary,
+    letterSpacing: 0.3,
+  },
 
-  emailBtn: {
+  // Outlined CTA (Sign in) — clearly secondary but still tappable
+  outlineBtn: {
+    marginTop: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
     backgroundColor: COLORS.surface,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
     borderRadius: RADIUS.lg,
-    paddingVertical: 16,
-    marginTop: 12,
+    paddingVertical: 14,
   },
-  emailBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.text, letterSpacing: 0.2 },
+  outlineBtnText: {
+    fontSize: 15,
+    fontWeight: FONT.bold,
+    color: COLORS.primary,
+    letterSpacing: 0.3,
+  },
 
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 18 },
   dividerLine: { flex: 1, height: 1.5, backgroundColor: COLORS.borderSoft },
   dividerText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 2 },
 
-  guestBtn: {
+  // Secondary (Guest) — outlined surface
+  secondaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
     borderRadius: RADIUS.lg,
     paddingVertical: 16,
   },
-  guestBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.onPrimary, letterSpacing: 0.2 },
+  secondaryBtnText: {
+    fontSize: 15,
+    fontWeight: FONT.semi,
+    color: COLORS.text,
+    letterSpacing: 0.2,
+  },
+
   btnDisabled: { opacity: 0.6 },
   tos: { marginTop: 22, fontSize: 12, color: COLORS.textMuted, textAlign: "center", lineHeight: 18 },
 
