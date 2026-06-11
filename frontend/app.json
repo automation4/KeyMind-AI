@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "KeyMind AI",
-    "slug": "keymind-ai-keyboard",
+    "slug": "keymind-ai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
