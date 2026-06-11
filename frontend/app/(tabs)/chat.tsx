@@ -8,10 +8,13 @@ import {
   ScrollView,
   Platform,
   ActivityIndicator,
+  ToastAndroid,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
@@ -164,6 +167,21 @@ export default function ChatScreen() {
     setMessages([]);
   };
 
+  // Long-press to copy any message (user or AI) → clipboard + haptic + toast on Android.
+  const copyMessage = async (content: string) => {
+    const clean = stripMarkdown(content).trim();
+    if (!clean) return;
+    try {
+      await Clipboard.setStringAsync(clean);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      if (Platform.OS === "android") {
+        ToastAndroid.show("Copied", ToastAndroid.SHORT);
+      }
+    } catch {
+      // ignore — clipboard not available
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <PatternBackground />
@@ -184,7 +202,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "translate-with-padding"}
-        keyboardVerticalOffset={80}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollRef}
@@ -224,13 +242,17 @@ export default function ChatScreen() {
           )}
 
           {messages.map((m, i) => (
-            <View
+            <TouchableOpacity
               key={i}
+              activeOpacity={0.85}
+              onLongPress={() => copyMessage(m.content)}
+              delayLongPress={350}
               style={[
                 styles.bubble,
                 m.role === "user" ? styles.userBubble : styles.aiBubble,
                 m.card ? styles.cardBubble : null,
               ]}
+              testID={`chat-bubble-${i}`}
             >
               {m.role === "user" ? (
                 <Text style={[styles.bubbleText, { color: COLORS.text }]}>{m.content}</Text>
@@ -287,7 +309,7 @@ export default function ChatScreen() {
                   />
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
           ))}
 
           {busy && (
@@ -319,6 +341,9 @@ export default function ChatScreen() {
             <MicButton
               size={40}
               onFinal={(spoken) => {
+                // IMPORTANT: clear the interim immediately so it doesn't
+                // briefly duplicate with the new committed text.
+                setChatInterim("");
                 setInput((prev) => {
                   const t = spoken.trim();
                   if (!t) return prev;

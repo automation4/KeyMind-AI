@@ -55,6 +55,9 @@ export function WriteInputCard({
 
   const appendFinal = React.useCallback(
     (spoken: string) => {
+      // Clear interim FIRST so the displayed text doesn't briefly double up
+      // (text + " " + interim) at the moment of finalisation.
+      setInterim("");
       const clean = spoken.trim();
       if (!clean) return;
       const prev = text;

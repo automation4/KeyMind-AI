@@ -10,6 +10,7 @@ import {
   Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { TOOLS } from "@/src/lib/tools";
@@ -31,6 +32,7 @@ type Props = {
 };
 
 export function ToolPickerSheet({ visible, activeTool, onClose, onSelect }: Props) {
+  const insets = useSafeAreaInsets();
   // Keep the modal mounted while the exit animation plays.
   const [rendered, setRendered] = useState(visible);
   const backdrop = useRef(new Animated.Value(0)).current;
@@ -99,7 +101,11 @@ export function ToolPickerSheet({ visible, activeTool, onClose, onSelect }: Prop
         <Animated.View
           style={[
             styles.sheet,
-            { maxHeight: "80%", transform: [{ translateY }, { scale }] },
+            {
+              maxHeight: "85%",
+              paddingBottom: Math.max(insets.bottom, 16) + 20,
+              transform: [{ translateY }, { scale }],
+            },
           ]}
         >
           <View style={styles.sheetHandle} />

@@ -42,7 +42,13 @@ export function ResultSuggestion({
   const copyValue = isWordList ? wordPart : suggestion;
 
   return (
-    <View style={styles.resultCard}>
+    <TouchableOpacity
+      activeOpacity={0.92}
+      style={styles.resultCard}
+      onLongPress={() => onCopy(copyValue)}
+      delayLongPress={350}
+      testID={`result-card-${index}`}
+    >
       {result.tool === "grammar" && index === 0 ? (
         result.data?.is_correct === true ? (
           <View style={styles.perfectBanner}>
@@ -92,7 +98,7 @@ export function ResultSuggestion({
           <ListenButton text={suggestion} small testID={`listen-idiom-${index}`} />
         ) : null}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
