@@ -241,12 +241,24 @@ export default function ChatScreen() {
             </View>
           )}
 
-          {messages.map((m, i) => (
-            <TouchableOpacity
+          {messages.map((m, i) => {
+            // Long content (≥ 2 paragraphs OR > 280 chars) → enable native text
+            // selection (long-press to select, drag handles to extend). Short
+            // content keeps the quick long-press-to-copy behaviour.
+            const paragraphs = (m.content.match(/\n\s*\n/g)?.length ?? 0) + 1;
+            const isLong = paragraphs >= 2 || m.content.length > 280;
+            const Wrapper: any = isLong ? View : TouchableOpacity;
+            const wrapperProps: any = isLong
+              ? {}
+              : {
+                  activeOpacity: 0.85,
+                  onLongPress: () => copyMessage(m.content),
+                  delayLongPress: 350,
+                };
+            return (
+            <Wrapper
               key={i}
-              activeOpacity={0.85}
-              onLongPress={() => copyMessage(m.content)}
-              delayLongPress={350}
+              {...wrapperProps}
               style={[
                 styles.bubble,
                 m.role === "user" ? styles.userBubble : styles.aiBubble,
@@ -255,7 +267,13 @@ export default function ChatScreen() {
               testID={`chat-bubble-${i}`}
             >
               {m.role === "user" ? (
-                <Text style={[styles.bubbleText, { color: COLORS.text }]}>{m.content}</Text>
+                <Text
+                  style={[styles.bubbleText, { color: COLORS.text }]}
+                  selectable={isLong}
+                  testID={`chat-msg-${i}`}
+                >
+                  {m.content}
+                </Text>
               ) : (
                 <MarkdownText
                   text={m.content}
@@ -309,8 +327,9 @@ export default function ChatScreen() {
                   />
                 </View>
               )}
-            </TouchableOpacity>
-          ))}
+            </Wrapper>
+            );
+          })}
 
           {busy && (
             <View style={[styles.bubble, styles.aiBubble, { flexDirection: "row", gap: 8 }]}>

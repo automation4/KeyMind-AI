@@ -76,10 +76,19 @@ export function useStreamingSpeechRecognition(
   const emittedFinalCountRef = useRef(0);
   const lastResultsLenRef = useRef(0);
 
+  // ⚠ THREAD-SAFETY: useSREvent subscribes to a GLOBAL event stream. When
+  // multiple screens (Chat + Write) mount this hook simultaneously, they all
+  // receive the same events. We gate every callback on this flag so only the
+  // instance that called start() actually routes transcripts to its own
+  // input. Without this, speaking on Chat would also overwrite Write's text.
+  const isActiveRef = useRef(false);
+
   // Subscribe to native/web speech events (no-op if module missing).
   if (useSREvent) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useSREvent("result", (event: any) => {
+      // Bail out unless THIS hook instance is the one listening right now.
+      if (!isActiveRef.current) return;
       try {
         const results = event?.results ?? [];
         if (!results.length) return;
@@ -132,6 +141,8 @@ export function useStreamingSpeechRecognition(
 
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useSREvent("end", () => {
+      if (!isActiveRef.current) return;
+      isActiveRef.current = false;
       setListening(false);
       setInterim("");
       onEndRef.current?.();
@@ -139,6 +150,8 @@ export function useStreamingSpeechRecognition(
 
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useSREvent("error", (event: any) => {
+      if (!isActiveRef.current) return;
+      isActiveRef.current = false;
       const code = event?.error || "unknown";
       const msg =
         event?.message ||
@@ -208,6 +221,8 @@ export function useStreamingSpeechRecognition(
         };
       }
       await ESR.start(startOpts);
+      // Mark THIS hook instance as the active receiver for global events.
+      isActiveRef.current = true;
       setListening(true);
     } catch (e: any) {
       setError(e?.message || "Failed to start voice input");
@@ -222,6 +237,7 @@ export function useStreamingSpeechRecognition(
     } catch {
       // ignore
     } finally {
+      isActiveRef.current = false;
       setListening(false);
       setInterim("");
     }
@@ -234,6 +250,7 @@ export function useStreamingSpeechRecognition(
     } catch {
       // ignore
     } finally {
+      isActiveRef.current = false;
       setListening(false);
       setInterim("");
     }

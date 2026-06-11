@@ -4,7 +4,18 @@ import { COLORS } from "@/src/lib/theme";
 
 export type ThemeMode = "light" | "dark" | "matte";
 export type AccentName = "orange" | "yellow" | "mint" | "peach" | "sky" | "lilac";
-export type PatternName = "classic" | "dots" | "grid" | "stripes" | "waves";
+export type PatternName =
+  | "classic"
+  | "dots"
+  | "grid"
+  | "stripes"
+  | "waves"
+  | "books"
+  | "paws"
+  | "feathers"
+  | "lines"
+  | "crosshatch"
+  | "chevron";
 
 type ThemeState = {
   mode: ThemeMode;
@@ -32,7 +43,19 @@ const accentMap: Record<AccentName, string> = {
   lilac: COLORS.lilac,
 };
 
-const PATTERN_IDS = ["classic", "dots", "grid", "stripes", "waves"];
+const PATTERN_IDS = [
+  "classic",
+  "dots",
+  "grid",
+  "stripes",
+  "waves",
+  "books",
+  "paws",
+  "feathers",
+  "lines",
+  "crosshatch",
+  "chevron",
+];
 
 const ThemeContext = createContext<ThemeState | null>(null);
 

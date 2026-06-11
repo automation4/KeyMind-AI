@@ -80,7 +80,7 @@ export default function Login() {
     // Detect that up-front and show a friendly message instead of opening Google.
     if (Platform.OS === "android" && !GOOGLE_ANDROID_CLIENT_ID) {
       setError(
-        "Google sign-in isn't enabled for Android yet. Please continue as Guest, or use the 22-tap admin login.",
+        "Google sign-in isn't available on Android yet. Please continue as Guest.",
       );
       return;
     }
