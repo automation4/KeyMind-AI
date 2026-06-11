@@ -86,6 +86,9 @@ export default function ChatScreen() {
   const [chatInterim, setChatInterim] = useState("");
   const [chatListening, setChatListening] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  // Track scroll position so we can show/hide the Top / Bottom floating buttons.
+  const [scrollPos, setScrollPos] = useState({ y: 0, contentH: 0, layoutH: 0 });
+  const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
   // Track whether we should auto-scroll to bottom when ScrollView content size changes.
   // Set to true ONLY right after a new message is added — prevents listen-button taps
   // (or any other in-card state change that resizes content) from yanking the scroll.
@@ -208,15 +211,28 @@ export default function ChatScreen() {
           ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 20, paddingBottom: 24 }}
-          onContentSizeChange={() => {
+          onScroll={(e) => {
+            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+            setScrollPos({
+              y: contentOffset.y,
+              contentH: contentSize.height,
+              layoutH: layoutMeasurement.height,
+            });
+          }}
+          scrollEventThrottle={64}
+          onContentSizeChange={(_, h) => {
             // Only scroll to the bottom when explicitly requested by the parent
             // (i.e. after a new message was just added). This prevents in-card
             // interactions like LISTEN button taps from jumping the scroll position.
+            setScrollPos((p) => ({ ...p, contentH: h }));
             if (autoScrollOnce.current) {
               autoScrollOnce.current = false;
               scrollRef.current?.scrollToEnd({ animated: true });
             }
           }}
+          onLayout={(e) =>
+            setScrollPos((p) => ({ ...p, layoutH: e.nativeEvent.layout.height }))
+          }
         >
           {messages.length === 0 && (
             <View>
@@ -339,6 +355,42 @@ export default function ChatScreen() {
           )}
         </ScrollView>
 
+        {/* Floating Top / Bottom scroll buttons — appear only when there's
+            enough content to scroll, and hide when already at that edge. */}
+        {(() => {
+          const isScrollable = scrollPos.contentH - scrollPos.layoutH > 160;
+          const atTop = scrollPos.y < 80;
+          const atBottom = scrollPos.y + scrollPos.layoutH >= scrollPos.contentH - 80;
+          if (!isScrollable) return null;
+          return (
+            <View pointerEvents="box-none" style={styles.scrollBtnStack}>
+              {!atTop && (
+                <TouchableOpacity
+                  onPress={scrollToTop}
+                  style={styles.scrollBtn}
+                  testID="chat-scroll-top"
+                  accessibilityLabel="Scroll to top"
+                >
+                  <Ionicons name="chevron-up" size={20} color={COLORS.text} />
+                </TouchableOpacity>
+              )}
+              {!atBottom && (
+                <TouchableOpacity
+                  onPress={() => {
+                    autoScrollOnce.current = true;
+                    scrollRef.current?.scrollToEnd({ animated: true });
+                  }}
+                  style={[styles.scrollBtn, { marginTop: 8 }]}
+                  testID="chat-scroll-bottom"
+                  accessibilityLabel="Scroll to bottom"
+                >
+                  <Ionicons name="chevron-down" size={20} color={COLORS.text} />
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })()}
+
         <View style={styles.composer}>
           <View style={styles.composerLangRow}>
             <DictateLanguagePicker compact />
@@ -419,6 +471,26 @@ const styles = StyleSheet.create({
   userBubble: { alignSelf: "flex-end", backgroundColor: COLORS.secondary },
   aiBubble: { alignSelf: "flex-start", backgroundColor: COLORS.surface, ...SHADOW.brutalSm },
   bubbleText: { fontSize: 14, lineHeight: 22, color: COLORS.text, fontWeight: FONT.regular },
+
+  // Floating scroll-helper stack pinned to the right edge, above the composer.
+  scrollBtnStack: {
+    position: "absolute",
+    right: 12,
+    bottom: 120,
+    alignItems: "flex-end",
+  },
+  scrollBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
+    ...SHADOW.brutalSm,
+  },
+
   composer: {
     padding: 12, paddingBottom: 12, paddingTop: 8,
     borderTopWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.bg,

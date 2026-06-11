@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
@@ -45,14 +45,48 @@ export default function HistoryScreen() {
     try { await api.deleteHistory(id); } catch {}
   };
 
+  const clearAll = async () => {
+    if (items.length === 0) return;
+    Alert.alert(
+      "Clear history?",
+      "This will permanently delete all of your saved corrections. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear all",
+          style: "destructive",
+          onPress: async () => {
+            const previous = items;
+            setItems([]);
+            try {
+              await Promise.all(previous.map((it) => api.deleteHistory(it.id)));
+            } catch {
+              // best-effort — refetch on next focus syncs the truth
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <PatternBackground />
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>YOUR LOG</Text>
           <Text style={styles.title}>History.</Text>
         </View>
+        {items.length > 0 && (
+          <TouchableOpacity
+            onPress={clearAll}
+            style={styles.clearBtn}
+            testID="history-clear-btn"
+            accessibilityLabel="Clear all history"
+          >
+            <Ionicons name="refresh" size={18} color={COLORS.text} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {loading ? (
@@ -106,7 +140,18 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  header: { paddingHorizontal: 20, paddingTop: 8 },
+  header: { paddingHorizontal: 20, paddingTop: 8, flexDirection: "row", alignItems: "center" },
+  clearBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    ...SHADOW.brutalSm,
+  },
   eyebrow: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
   title: { fontSize: 32, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -1.2 },
   empty: { alignItems: "center", marginTop: 60, gap: 12, paddingHorizontal: 24 },

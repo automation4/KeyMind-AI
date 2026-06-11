@@ -416,8 +416,8 @@ export function VocabCard({
         </View>
       ) : null}
 
-      {/* Idioms & phrases */}
-      {Array.isArray(data.idioms_phrases) && data.idioms_phrases.length > 0 ? (
+      {/* Idioms & phrases — also hidden when the parent asks for a compact card. */}
+      {!hideListSections && Array.isArray(data.idioms_phrases) && data.idioms_phrases.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>IDIOMS &amp; PHRASES</Text>
           {data.idioms_phrases.slice(0, 5).map((item, idx) => {
