@@ -1,0 +1,851 @@
+================================================================================
+  KEYMIND AI — COMPLETE SELF-HOSTED WORKFLOW
+  Export from Emergent → Local Dev → Own Mongo → EAS APK → Production Backend
+  Last updated: 11 June 2026
+================================================================================
+
+This file is your one-stop, step-by-step playbook for taking KeyMind AI off
+Emergent and running it 100% on your own infrastructure.
+
+It assumes ZERO prior knowledge — every command is included.
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+
+  PART  1.  Project overview & file locations
+  PART  2.  Local machine prerequisites (one-time setup)
+  PART  3.  Export source code from Emergent  →  GitHub  →  Local IDE
+  PART  4.  Set up your own MongoDB (Docker OR Atlas)
+  PART  5.  Migrate existing data from Emergent's MongoDB
+  PART  6.  Configure local .env files
+  PART  7.  Run the FastAPI backend locally
+  PART  8.  Run the Expo frontend locally
+  PART  9.  Test on Android emulator / iOS simulator / Expo Go
+  PART 10.  Day-to-day development workflow (git branches, hot reload)
+  PART 11.  Set up EAS for independent Android APK builds
+  PART 12.  Generate APK + retrieve SHA-1 for Google OAuth
+  PART 13.  Configure real Google OAuth (NO Emergent branding)
+  PART 14.  Deploy the FastAPI backend to Railway / Render / Fly.io
+  PART 15.  Build a PRODUCTION APK that hits your deployed backend
+  PART 16.  Common gotchas + troubleshooting
+  PART 17.  Quick reference — commands you'll run every day
+  PART 18.  Final checklist before you ship
+
+================================================================================
+  PART 1.  PROJECT OVERVIEW & FILE LOCATIONS
+================================================================================
+
+  KeyMind AI consists of three pieces:
+
+  ┌──────────────────┬─────────────────────────────────────────────────────┐
+  │ Piece            │ What & where                                        │
+  ├──────────────────┼─────────────────────────────────────────────────────┤
+  │ Backend          │ FastAPI app in   /app/backend/                      │
+  │                  │ Entrypoint:      server.py     (uvicorn server:app) │
+  │                  │ Routes prefixed: /api/...                           │
+  │                  │ Uses libs:       fastapi, motor, emergentintegrations │
+  ├──────────────────┼─────────────────────────────────────────────────────┤
+  │ Frontend         │ Expo SDK 54 app in /app/frontend/                   │
+  │                  │ Entrypoint:        expo-router/entry                │
+  │                  │ Routing:           file-based, under /app/frontend/app/ │
+  │                  │ Calls backend at:  process.env.EXPO_PUBLIC_BACKEND_URL │
+  ├──────────────────┼─────────────────────────────────────────────────────┤
+  │ Database         │ MongoDB                                             │
+  │                  │ DB name:    keymind_db (env DB_NAME)                │
+  │                  │ Collections: users, user_sessions, history,         │
+  │                  │              chat_messages, admin_whitelist         │
+  └──────────────────┴─────────────────────────────────────────────────────┘
+
+  Key files you will edit often:
+    /app/backend/server.py
+    /app/backend/prompts.py
+    /app/backend/.env
+    /app/frontend/app/  (all screens)
+    /app/frontend/src/  (components, hooks, contexts)
+    /app/frontend/.env
+    /app/frontend/app.json   (Expo config — app name, Android package, etc.)
+
+
+================================================================================
+  PART 2.  LOCAL MACHINE PREREQUISITES (one-time)
+================================================================================
+
+  Install these on your laptop BEFORE you start. Pick the right line for your OS.
+
+  2.1  Node.js  (v20 LTS recommended)
+       https://nodejs.org/en/download   → install the "LTS" version.
+       Verify:    node --version       (should print v20.x.x)
+                  npm --version
+
+  2.2  Yarn 1.x  (the project uses Yarn — check /app/frontend/package.json
+       "packageManager" field if unsure)
+       npm install -g yarn
+       Verify:    yarn --version       (should print 1.22.x)
+
+  2.3  Python 3.11+
+       https://www.python.org/downloads
+       Verify:    python3 --version    (3.11.x or higher)
+
+  2.4  Git
+       https://git-scm.com/downloads
+       Verify:    git --version
+
+  2.5  Docker Desktop  (only if you choose local MongoDB in PART 4)
+       https://www.docker.com/products/docker-desktop
+       Verify:    docker --version
+                  docker compose version
+
+  2.6  VS Code   (recommended IDE)
+       https://code.visualstudio.com
+       Suggested extensions:
+         - Python (ms-python.python)
+         - Pylance
+         - ESLint
+         - Prettier
+         - React Native Tools
+         - GitLens
+         - Thunder Client (for testing API endpoints)
+
+  2.7  EAS CLI  (Expo's build service — required to make APKs)
+       npm install -g eas-cli
+       Verify:    eas --version
+
+  2.8  Android Studio   (to run emulator & build local APKs)
+       https://developer.android.com/studio
+       AFTER install:
+         a) Open Android Studio → More Actions → SDK Manager
+         b) Install: Android SDK Platform 34, Android SDK Build-Tools 34.0.0
+         c) Open Tools → Device Manager → Create Virtual Device
+            → Pick "Pixel 7 / API 34" and finish.
+         d) Add to your shell profile (~/.zshrc or ~/.bashrc):
+              export ANDROID_HOME=$HOME/Library/Android/sdk     # macOS
+              # export ANDROID_HOME=$HOME/Android/Sdk           # Linux
+              export PATH=$PATH:$ANDROID_HOME/emulator
+              export PATH=$PATH:$ANDROID_HOME/platform-tools
+         e) Restart your terminal.
+         f) Verify:   adb --version
+                      emulator -list-avds
+
+  2.9  Xcode  (only on macOS, for iOS simulator)
+       Mac App Store → search "Xcode" → install (≈10 GB).
+       After install:    xcodebuild -runFirstLaunch
+       Verify:           xcrun simctl list
+
+  2.10 MongoDB Database Tools  (needed to migrate data — PART 5)
+       https://www.mongodb.com/try/download/database-tools
+       Provides:   mongodump, mongorestore, mongoexport, mongoimport
+       Verify:     mongodump --version
+
+  2.11 Optional but useful:
+       - MongoDB Compass     (GUI for browsing your DB)
+         https://www.mongodb.com/try/download/compass
+       - Postman or Bruno    (test API endpoints)
+
+
+================================================================================
+  PART 3.  EXPORT SOURCE CODE FROM EMERGENT
+================================================================================
+
+  Option A (RECOMMENDED) — Push directly to GitHub
+  --------------------------------------------------
+  1. Sign into Emergent.
+  2. Open your KeyMind AI project.
+  3. Click "Save to GitHub" in the top-right area of the chat.
+  4. If first time:
+        • Click "Connect GitHub"
+        • Authorise Emergent
+        • Choose a GitHub account/org
+  5. Pick "Create new repository":
+        • Name:        keymind-ai
+        • Visibility:  Private (recommended)
+        • Branch:      main
+  6. Click "PUSH TO GITHUB" and wait ~30 seconds.
+  7. On your local machine:
+        cd ~/projects                  # any folder you like
+        git clone https://github.com/YOUR_USERNAME/keymind-ai.git
+        cd keymind-ai
+        code .                          # opens VS Code
+
+  Option B — ZIP download
+  -----------------------
+  If GitHub isn't available, ask Emergent support for a ZIP export of /app.
+  Extract to ~/projects/keymind-ai and open in VS Code.
+
+  After cloning, your folder structure should be:
+        keymind-ai/
+          backend/      ← FastAPI
+          frontend/     ← Expo
+          memory/
+          ...
+
+
+================================================================================
+  PART 4.  SET UP YOUR OWN MONGODB
+================================================================================
+
+  Pick ONE option.
+
+  ─────────────────────────────────────────────────────────────────────
+  Option A — Local MongoDB via Docker Compose  (best for dev & offline)
+  ─────────────────────────────────────────────────────────────────────
+
+  1. Create a file named  docker-compose.yml  at the repo ROOT:
+
+       version: "3.9"
+       services:
+         mongo:
+           image: mongo:7
+           container_name: keymind-mongo
+           restart: unless-stopped
+           ports:
+             - "27017:27017"
+           environment:
+             MONGO_INITDB_ROOT_USERNAME: admin
+             MONGO_INITDB_ROOT_PASSWORD: change-me-strong
+           volumes:
+             - keymind-mongo-data:/data/db
+
+       volumes:
+         keymind-mongo-data:
+
+  2. Start it:
+       docker compose up -d
+
+  3. Your connection string is:
+       mongodb://admin:change-me-strong@localhost:27017/?authSource=admin
+
+  4. Stop / restart:
+       docker compose down      # stop
+       docker compose up -d     # start again, data persists in the volume
+
+  ─────────────────────────────────────────────────────────────────
+  Option B — MongoDB Atlas (free cloud Mongo, no local install)
+  ─────────────────────────────────────────────────────────────────
+
+  1. Sign up at  https://www.mongodb.com/cloud/atlas/register
+  2. Build a "Shared" M0 free cluster (any region near you).
+  3. SECURITY → "Database Access":
+        • Add new user:    keymind_user
+        • Password:        generate a strong one and SAVE it
+        • Privileges:      Atlas admin (for now; lock down later)
+  4. SECURITY → "Network Access":
+        • Click "Add IP Address"
+        • For now choose "Allow access from anywhere" (0.0.0.0/0)
+          (later, restrict to your home IP + your backend host IP)
+  5. DEPLOYMENT → "Database" → click "Connect" on your cluster:
+        • Choose "Drivers"
+        • Driver: Python 3.6 or later
+        • Copy the connection string. It looks like:
+            mongodb+srv://keymind_user:<password>@cluster0.abcde.mongodb.net/
+               ?retryWrites=true&w=majority&appName=Cluster0
+        • Replace <password> with the real password (URL-encode special chars).
+
+
+================================================================================
+  PART 5.  MIGRATE DATA FROM EMERGENT'S MONGO (optional but recommended)
+================================================================================
+
+  Skip this if you're starting fresh.
+
+  5.1  Inside the Emergent sandbox terminal, run:
+
+         cd /tmp
+         mongodump --uri "$MONGO_URL" --db=keymind_db --out=./dump
+         tar czf keymind-dump.tar.gz dump
+
+       Then download  /tmp/keymind-dump.tar.gz  to your local machine
+       (drag-and-drop in the file panel, or  scp  if available).
+
+  5.2  On your local machine, extract:
+         tar xzf keymind-dump.tar.gz
+         ls dump/keymind_db/    # should see users.bson, history.bson, etc.
+
+  5.3  Restore into your new Mongo:
+
+       For Docker Compose:
+         mongorestore \
+           --uri "mongodb://admin:change-me-strong@localhost:27017/?authSource=admin" \
+           --db=keymind_db \
+           dump/keymind_db
+
+       For Atlas:
+         mongorestore \
+           --uri "mongodb+srv://keymind_user:REALPASSWORD@cluster0.abcde.mongodb.net/" \
+           --db=keymind_db \
+           dump/keymind_db
+
+  5.4  Verify with Compass (or mongosh):
+         mongosh "<your connection string>"
+         use keymind_db
+         db.users.countDocuments()
+         db.history.countDocuments()
+
+
+================================================================================
+  PART 6.  CONFIGURE LOCAL .env FILES
+================================================================================
+
+  These files must NEVER be committed to Git. Make sure your .gitignore at
+  the repo root contains:
+
+         backend/.env
+         frontend/.env
+         **/.env.local
+
+  6.1  Create  backend/.env  (copy-paste, then change values):
+
+         # ---- MongoDB ------------------------------------------------------
+         # For Docker Compose (Part 4 Option A):
+         MONGO_URL=mongodb://admin:change-me-strong@localhost:27017/?authSource=admin
+         # For Atlas (Part 4 Option B), comment line above and use:
+         # MONGO_URL=mongodb+srv://keymind_user:REALPASSWORD@cluster0.abcde.mongodb.net/
+
+         DB_NAME=keymind_db
+
+         # ---- AI key (Emergent Universal LLM Key) --------------------------
+         # Get it from Emergent → Profile icon → Universal Key → Copy.
+         # Works for OpenAI text+image, Gemini Nano-Banana, Claude text, TTS, Whisper.
+         EMERGENT_LLM_KEY=sk-emergent-xxxxxxxxxxxxxxxxxxxx
+
+         # ---- Admin login (used by the 22-tap admin modal) -----------------
+         # IMPORTANT: wrap the password in SINGLE quotes so the shell does NOT
+         # try to expand the $ inside it.
+         ADMIN_EMAIL=himthegreat@gmail.com
+         ADMIN_PASSWORD='aa$fufm2q'
+
+  6.2  Create  frontend/.env  (copy-paste, then change values):
+
+         # ---- Backend URL --------------------------------------------------
+         # Local dev (default):
+         EXPO_PUBLIC_BACKEND_URL=http://localhost:8000
+
+         # For the Android EMULATOR specifically, you'll override with:
+         #   EXPO_PUBLIC_BACKEND_URL=http://10.0.2.2:8000
+         # because "localhost" inside the emulator means the emulator itself.
+
+         # ---- Google OAuth (Web client only for now) -----------------------
+         # Same one you've been using in Emergent. You can leave blank if you
+         # don't use Google sign-in — the UI shows a friendly message instead.
+         EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=241457285059-0f2oc6cvu40uakmp61dejr9ac5vifvdm.apps.googleusercontent.com
+
+         # ---- Android-only OAuth client (filled in after PART 13) ----------
+         # EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=xxxxxxxxxxxx-yyy.apps.googleusercontent.com
+
+         # ---- iOS-only OAuth client (optional) -----------------------------
+         # EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=xxxxxxxxxxxx-yyy.apps.googleusercontent.com
+
+       DO NOT add  EXPO_PACKAGER_PROXY_URL  or  EXPO_PACKAGER_HOSTNAME  on
+       your local machine — those are only used by the Emergent preview tunnel.
+
+  6.3  Add a  .env.example  in each folder (commit this, NOT the .env):
+
+         backend/.env.example     ← same keys as .env but with placeholder values
+         frontend/.env.example    ← same
+
+
+================================================================================
+  PART 7.  RUN THE FASTAPI BACKEND LOCALLY
+================================================================================
+
+  Open Terminal-1 (keep it dedicated to the backend).
+
+  7.1  Activate Python virtualenv:
+         cd ~/projects/keymind-ai/backend
+         python3 -m venv venv
+         source venv/bin/activate                # macOS / Linux
+         # venv\Scripts\activate                 # Windows PowerShell
+
+  7.2  Install dependencies:
+         pip install --upgrade pip
+         pip install -r requirements.txt
+
+       If you ever add a new package:
+         pip install some-package
+         pip freeze > requirements.txt
+
+  7.3  Start the server:
+         uvicorn server:app --reload --host 0.0.0.0 --port 8000
+
+       Expected output:
+         INFO:  Uvicorn running on http://0.0.0.0:8000  (Press CTRL+C to quit)
+         INFO:  Application startup complete.
+         server - INFO - Indexes ready
+
+  7.4  Verify it's alive:
+         Open  http://localhost:8000/docs   in your browser → Swagger UI
+         should appear with all /api/* routes listed.
+
+  7.5  Quick sanity check from another terminal:
+         curl http://localhost:8000/api/health   2>/dev/null || \
+         curl http://localhost:8000/api/auth/me
+
+  If you get an error like "Address already in use", change to --port 8001
+  (and update EXPO_PUBLIC_BACKEND_URL on the frontend to match).
+
+
+================================================================================
+  PART 8.  RUN THE EXPO FRONTEND LOCALLY
+================================================================================
+
+  Open Terminal-2 (dedicated to the frontend — keep the backend Terminal-1 running).
+
+  8.1  Install deps (FIRST time only, also after pulling new code):
+         cd ~/projects/keymind-ai/frontend
+         yarn install
+
+       NOTE: package.json declares the package manager. If yarn complains,
+       run:    corepack enable yarn
+
+  8.2  Start the Expo dev server:
+         npx expo start
+
+       You'll see a QR code + a menu like:
+         › Press a → Android       (opens Android emulator)
+         › Press i → iOS           (opens iOS simulator)
+         › Press w → web           (opens browser preview)
+         › Press r → reload app
+         › Press m → toggle menu
+
+  8.3  Run on the Android emulator:
+         1. Start the AVD first:   emulator -avd <name-of-your-AVD> &
+            (or open Android Studio → Device Manager → press Play).
+         2. In the Expo terminal, press  a
+         3. First time it'll prompt to install Expo Go inside the emulator.
+            Subsequent launches are instant.
+
+         IMPORTANT: in /app/frontend/.env, the emulator can't see "localhost",
+         so set:
+              EXPO_PUBLIC_BACKEND_URL=http://10.0.2.2:8000
+         Then restart the Expo dev server  (Ctrl+C, then `npx expo start`).
+
+  8.4  Run on iOS simulator (macOS only):
+         In the Expo terminal, press  i
+
+  8.5  Run on a real phone (Expo Go):
+         a) Install "Expo Go" from the Play Store / App Store.
+         b) Phone and laptop on the SAME Wi-Fi.
+         c) Scan the QR code shown in the Expo CLI.
+            (iOS → Camera app; Android → Expo Go app's scanner.)
+         d) For phone to reach your backend, set:
+              EXPO_PUBLIC_BACKEND_URL=http://<your-laptop-LAN-IP>:8000
+            e.g.  http://192.168.1.42:8000     (run `ipconfig` / `ifconfig`)
+
+  8.6  Run on web (quickest sanity-check):
+         Press  w   in the Expo CLI. Opens at  http://localhost:8081
+
+       Bear in mind: a few native-only modules (Application.getAndroidId,
+       speech-recognition, push notifications) won't work on web.
+
+
+================================================================================
+  PART 9.  TEST CRUCIAL FLOWS AFTER INITIAL SETUP
+================================================================================
+
+   • Guest login                — should reach /setup, then home tabs
+   • 22-tap admin login         — tap KM logo 22 times → enter admin creds
+                                  from backend/.env  → should land as Admin
+   • Write tab grammar check    — paste any sentence → tap GO → result card
+   • Chat tab "Ask AI"          — type a question → AI reply
+   • History tab                — should list previous corrections
+   • Settings → patterns        — pick "Books" / "Paws" → see the background
+   • Settings → DIAGNOSTICS     — visible only as admin, shows your Device ID
+
+  If anything 500s, check Terminal-1 logs for stacktraces.
+
+
+================================================================================
+  PART 10.  DAY-TO-DAY DEVELOPMENT WORKFLOW
+================================================================================
+
+  10.1  Branching:
+          git checkout -b feature/something
+          # ...edit code...
+          git add .
+          git commit -m "feature: short message"
+          git push -u origin feature/something
+          # Open Pull Request on GitHub, review, merge to main.
+
+  10.2  Hot reload:
+          - FastAPI auto-reloads on save when started with --reload
+          - Metro (expo start) auto-reloads on save
+          - Press 'r' in Expo CLI to force-reload
+          - Press 'm' to open the dev menu
+
+  10.3  Adding npm packages:
+          cd frontend
+          yarn add some-package         # or
+          npx expo install some-package # ← preferred (picks SDK-compatible version)
+
+  10.4  Adding Python packages:
+          cd backend
+          source venv/bin/activate
+          pip install some-package
+          pip freeze > requirements.txt
+          git add requirements.txt
+
+
+================================================================================
+  PART 11.  SET UP EAS FOR INDEPENDENT ANDROID APK BUILDS
+================================================================================
+
+  EAS = Expo Application Services — builds your APK in the cloud (free tier
+  is enough for ~30 builds/month).
+
+  11.1  Log in:
+          cd ~/projects/keymind-ai/frontend
+          eas login
+          # If you don't have an Expo account, sign up at  https://expo.dev
+
+  11.2  Initialize this project:
+          eas init
+          # Press Enter to accept the suggested project name "keymind-ai"
+          # It creates an EAS project ID and adds it to app.json under
+          # expo.extra.eas.projectId — commit this change.
+
+  11.3  Configure build profiles:
+          eas build:configure
+          # Pick "All" (Android + iOS) so eas.json is created for both.
+
+       Then open the generated  eas.json  and replace its contents with:
+
+         {
+           "cli": { "version": ">= 12.0.0" },
+           "build": {
+             "development": {
+               "developmentClient": true,
+               "distribution": "internal",
+               "android": { "buildType": "apk" }
+             },
+             "preview": {
+               "distribution": "internal",
+               "channel": "preview",
+               "android": { "buildType": "apk" },
+               "env": {
+                 "EXPO_PUBLIC_BACKEND_URL": "https://YOUR-DEPLOYED-BACKEND.example.com"
+               }
+             },
+             "production": {
+               "channel": "production",
+               "android": { "buildType": "app-bundle" },
+               "env": {
+                 "EXPO_PUBLIC_BACKEND_URL": "https://YOUR-DEPLOYED-BACKEND.example.com"
+               }
+             }
+           },
+           "submit": { "production": {} }
+         }
+
+       Notes:
+         - "preview" → APK file (sideloadable).
+         - "production" → AAB for Play Store upload.
+         - You'll fill in YOUR-DEPLOYED-BACKEND in PART 14.
+         - For now you can leave them as http://localhost:8000 — but the
+           APK won't work on real phones until the backend is publicly reachable.
+
+
+================================================================================
+  PART 12.  BUILD AN APK  +  RETRIEVE THE SHA-1 FINGERPRINT
+================================================================================
+
+  12.1  Trigger the first preview APK build:
+          eas build -p android --profile preview
+
+       EAS asks if it should generate a new Android keystore. Answer YES.
+       Build takes ~10-15 minutes; you'll see progress in the terminal and
+       at  https://expo.dev/accounts/<you>/projects/keymind-ai/builds
+
+  12.2  Once finished, you'll see:
+          "Build finished. Download the build at: https://expo.dev/.../build/<id>"
+          The page has a big "Install" button (APK) + a QR code.
+
+  12.3  Find your keystore's SHA-1 — you NEED it for Google OAuth:
+          eas credentials
+          # → Pick: Android → Production / Preview → Keystore → View
+          # → Copy the value labelled "SHA-1 Fingerprint" (40 hex chars,
+          #   colon-separated, like "AA:BB:CC:...")
+
+       Save the SHA-1 somewhere safe. You'll paste it into Google in PART 13.
+
+
+================================================================================
+  PART 13.  CONFIGURE REAL GOOGLE OAUTH (NO Emergent branding)
+================================================================================
+
+  Right now your Web Client ID works on web preview but FAILS on Android with
+  "Custom scheme URIs are not allowed for WEB client type". That's because
+  Android needs an *Android-type* OAuth client.
+
+  13.1  Open  https://console.cloud.google.com/  → pick the same Google
+        project that owns your existing Web Client ID.
+
+  13.2  APIs & Services → "Credentials" → "Create Credentials"
+        → "OAuth client ID".
+
+  13.3  Application type: **Android**
+
+        Package name:   com.keymind.app     (matches app.json
+                                            "expo.android.package")
+        SHA-1:          paste the value from PART 12.3
+
+  13.4  Click "Create". Copy the new **Android Client ID**:
+          xxxxxxxxxxxx-yyyyyyyyy.apps.googleusercontent.com
+
+  13.5  Add it to  frontend/.env :
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=xxxxxxxxxxxx-yyy.apps.googleusercontent.com
+
+  13.6  Also add to  eas.json  inside both "preview" and "production"
+        profiles' "env" object so the value is baked into the APK build:
+          "env": {
+            "EXPO_PUBLIC_BACKEND_URL": "https://YOUR-BACKEND",
+            "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "xxx-yyy.apps.googleusercontent.com",
+            "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "241457285059-0f2oc6cvu40uakmp61dejr9ac5vifvdm.apps.googleusercontent.com"
+          }
+
+  13.7  OAuth Consent Screen polish (to show "Continue to KeyMindAI"):
+          APIs & Services → "OAuth consent screen"
+          • App name:               KeyMindAI
+          • User support email:     your email
+          • App logo:               upload a 120x120 PNG (optional)
+          • Authorized domains:     your-deployed-backend domain (PART 14)
+          • Save & publish (External user type → Testing OK while small)
+
+  13.8  Rebuild the APK so the new Android client ID is baked in:
+          eas build -p android --profile preview
+
+
+================================================================================
+  PART 14.  DEPLOY THE FASTAPI BACKEND PUBLICLY
+================================================================================
+
+  Pick ONE host. Railway is simplest.
+
+  ─────────────────────────────────────────────────────────────
+  Option A — Railway   (recommended for beginners)
+  ─────────────────────────────────────────────────────────────
+  1. Sign up at  https://railway.app   (use GitHub login).
+  2. Click "New Project" → "Deploy from GitHub repo" → pick keymind-ai.
+  3. After import, click "Settings" → "Root directory" → set:  backend
+  4. Click "Variables" → add these one by one:
+        MONGO_URL             = <your Atlas connection string>
+        DB_NAME               = keymind_db
+        EMERGENT_LLM_KEY      = sk-emergent-xxxxx
+        ADMIN_EMAIL           = himthegreat@gmail.com
+        ADMIN_PASSWORD        = aa$fufm2q          (no quotes here)
+  5. Click "Deployments" tab → wait for first build.
+     Railway auto-detects Python, runs:
+         pip install -r requirements.txt
+         uvicorn server:app --host 0.0.0.0 --port $PORT
+  6. Click "Settings" → "Networking" → "Generate Domain":
+        https://keymind-backend-production.up.railway.app
+     This is your PUBLIC backend URL. Save it.
+  7. Test:
+        curl https://keymind-backend-production.up.railway.app/api/auth/me
+        (expect 401, but reachable — good.)
+
+  ─────────────────────────────────────────────────────────────
+  Option B — Render
+  ─────────────────────────────────────────────────────────────
+  1. https://render.com  → New → Web Service → Connect repo → backend folder.
+  2. Build command:    pip install -r requirements.txt
+     Start command:    uvicorn server:app --host 0.0.0.0 --port $PORT
+  3. Add the same env vars as Railway.
+  4. URL appears under "Web Service" → "Settings" → "URL".
+
+  ─────────────────────────────────────────────────────────────
+  Option C — Fly.io   (most control, free 3 small VMs)
+  ─────────────────────────────────────────────────────────────
+  1. curl -L https://fly.io/install.sh | sh
+  2. cd backend
+     fly auth login
+     fly launch                  # detects Python, generates fly.toml
+                                 # IMPORTANT: when asked, DO NOT set up Postgres.
+                                 # Region: pick one near you.
+  3. Set secrets:
+        fly secrets set MONGO_URL="mongodb+srv://..."
+        fly secrets set DB_NAME=keymind_db
+        fly secrets set EMERGENT_LLM_KEY=sk-emergent-xxxxx
+        fly secrets set ADMIN_EMAIL=himthegreat@gmail.com
+        fly secrets set ADMIN_PASSWORD='aa$fufm2q'
+  4. fly deploy
+  5. URL: https://<your-app>.fly.dev
+
+  ─────────────────────────────────────────────────────────────
+  Common to all hosts — update CORS in server.py if you tighten
+  ─────────────────────────────────────────────────────────────
+  Today server.py uses  allow_origins=["*"]  which works everywhere.
+  After you ship, replace with a list of your real origins, e.g.:
+        allow_origins=[
+            "https://keymind-backend-production.up.railway.app",
+            "exp://*",          # Expo Go traffic
+            "https://localhost:*"
+        ]
+
+
+================================================================================
+  PART 15.  BUILD A PRODUCTION APK THAT TALKS TO YOUR DEPLOYED BACKEND
+================================================================================
+
+  15.1  Edit  eas.json  → replace "YOUR-DEPLOYED-BACKEND.example.com" with
+        your Railway/Render/Fly URL in BOTH preview and production profiles.
+
+        Example for production:
+          "production": {
+            "channel": "production",
+            "android": { "buildType": "app-bundle" },
+            "env": {
+              "EXPO_PUBLIC_BACKEND_URL": "https://keymind-backend-production.up.railway.app",
+              "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "241457285059-0f2oc6cvu40uakmp61dejr9ac5vifvdm.apps.googleusercontent.com",
+              "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "xxxxx-yyy.apps.googleusercontent.com"
+            }
+          }
+
+  15.2  Bump the version in  app.json   "expo.version" (e.g. "1.0.1") and
+        "expo.android.versionCode" by 1 (e.g. 2) every time you build.
+
+  15.3  Build a sideloadable APK for testers:
+          eas build -p android --profile preview
+
+  15.4  Build an AAB for Play Store upload:
+          eas build -p android --profile production
+          # Result: a .aab file (Play Store accepts ONLY .aab now)
+
+  15.5  Install the APK on your phone:
+          a) Open the build page link Expo gave you.
+          b) Tap "Install" (or scan the QR code).
+          c) Android will warn about "untrusted apps" — Allow → Install.
+          d) Open the app on your phone — name should be "KeyMind AI".
+
+  15.6  Submit AAB to Play Store (when ready):
+          eas submit -p android --profile production
+          # First time, you'll provide a service-account JSON from Google Play
+          # Console (Setup → API access → create / connect Google Cloud project).
+
+
+================================================================================
+  PART 16.  COMMON GOTCHAS + TROUBLESHOOTING
+================================================================================
+
+  Symptom: "Network request failed" on Android emulator
+  ▸ EXPO_PUBLIC_BACKEND_URL must be http://10.0.2.2:8000 (NOT localhost).
+    On a real phone, use http://<laptop-IP>:8000.
+
+  Symptom: "Custom scheme URIs are not allowed for WEB client type"
+  ▸ You're missing the Android OAuth client → finish PART 13.
+
+  Symptom: Google sign-in fails on a brand-new keystore
+  ▸ The SHA-1 you registered in Google Cloud was the OLD keystore's.
+    Re-run  eas credentials  → copy new SHA-1 → update the Android OAuth
+    client → rebuild.
+
+  Symptom: "Cleartext HTTP traffic to ... not permitted" on Android 9+
+  ▸ Your APK is hitting an http://  backend.
+    Either (a) move backend to https (Railway/Render do this automatically),
+    or (b) add to app.json:
+            "android": { "usesCleartextTraffic": true }
+        (NOT recommended for production.)
+
+  Symptom: APK installs but launcher still says "KeyMind AI Keyboard"
+  ▸ Uninstall the OLD app FIRST (Android caches launcher labels),
+    reboot phone, install the new APK.
+
+  Symptom: pymongo / motor "Authentication failed"
+  ▸ MongoDB connection string is missing "?authSource=admin" for Docker,
+    or you forgot to URL-encode special chars in the Atlas password.
+
+  Symptom: "EAS Build failed: dependency cycle in expo modules"
+  ▸ Run:  npx expo install --fix
+    Then commit the resulting package.json/yarn.lock changes.
+
+  Symptom: Backend works locally but Railway shows "Application failed to respond"
+  ▸ Make sure start command uses  $PORT  not 8000:
+        uvicorn server:app --host 0.0.0.0 --port $PORT
+
+  Symptom: Guest usage resets after fresh install
+  ▸ This happens if Android signs the new APK with a different keystore →
+    Application.getAndroidId() returns a different value. With EAS you have
+    ONE persistent keystore by default — make sure NOT to delete & recreate
+    it between builds. Run  eas credentials  to verify.
+
+  Symptom: Yarn complains "packageManager mismatch"
+  ▸ corepack enable yarn      (run once per machine)
+
+
+================================================================================
+  PART 17.  QUICK-REFERENCE — COMMANDS YOU'LL RUN EVERY DAY
+================================================================================
+
+  Mongo (Docker):
+      docker compose up -d
+      docker compose down
+
+  Backend:
+      cd backend
+      source venv/bin/activate
+      uvicorn server:app --reload --host 0.0.0.0 --port 8000
+
+  Frontend:
+      cd frontend
+      npx expo start                       # interactive
+      npx expo start --android             # auto-launch Android
+      npx expo start --tunnel              # for slow networks / phones not on Wi-Fi
+
+  Lint / type-check:
+      cd frontend && yarn lint
+      cd backend && python -m pyflakes server.py
+
+  EAS:
+      eas build -p android --profile preview      # APK for sideload
+      eas build -p android --profile production   # AAB for Play Store
+      eas credentials                              # view / rotate keystore
+      eas submit -p android --profile production   # upload AAB to Play
+
+  Git:
+      git status
+      git add . && git commit -m "msg"
+      git push
+      git pull --rebase
+
+
+================================================================================
+  PART 18.  FINAL CHECKLIST BEFORE YOU SHIP
+================================================================================
+
+  [ ] Source code pushed to private GitHub repo
+  [ ] Both .env files filled in locally, .env added to .gitignore
+  [ ] Mongo running (Docker or Atlas) and reachable from backend
+  [ ] Backend starts cleanly, /docs page loads
+  [ ] Frontend `npx expo start` opens; web preview works
+  [ ] Android emulator: Guest login works end-to-end
+  [ ] iOS simulator (macOS): same
+  [ ] EAS project initialised (eas init done, eas.json edited)
+  [ ] Android OAuth Client created in Google Cloud (PART 13)
+  [ ] OAuth Consent Screen App name = "KeyMindAI" + authorised domain
+  [ ] frontend/.env  +  eas.json   both have all 3 client IDs
+  [ ] First `eas build -p android --profile preview` succeeds
+  [ ] APK installed on real phone: launcher reads "KeyMind AI"
+  [ ] Backend deployed (Railway/Render/Fly); HTTPS URL reachable
+  [ ] Atlas IP whitelist contains the backend host's egress IP
+  [ ] eas.json "env" object has the prod EXPO_PUBLIC_BACKEND_URL
+  [ ] Production AAB built (eas build -p android --profile production)
+  [ ] Play Store internal-testing track created → AAB uploaded
+
+================================================================================
+  THAT'S IT — YOU OWN THE WHOLE STACK NOW.
+================================================================================
+
+  Total cost estimate (all free tiers + one-time setup):
+    • GitHub               $0  (private repos free)
+    • MongoDB Atlas M0     $0  (512 MB, plenty for early users)
+    • Railway              $5 in free credits, then ~$5/month for a tiny app
+    • EAS Build (Expo)     ~30 free Android builds/month
+    • Google Cloud OAuth   $0
+    • Play Store           $25 one-time developer registration
+
+  Need help / something missing? Drop the question back into Emergent and
+  I'll iterate this file.
+
+  Keep this guide in your repo as  SELF_HOSTING_GUIDE.txt  so the next
+  person (or future-you) has the whole path documented.
+
+================================================================================
