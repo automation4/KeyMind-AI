@@ -285,9 +285,38 @@ def format_prompt(tool: str, options: Dict[str, Any]) -> str:
         "style": options.get("style", "poem"),
     }
     try:
-        return template.format(**safe)
+        prompt = template.format(**safe)
     except KeyError:
-        return template
+        prompt = template
+
+    # Tools that TRANSFORM the user's text (do not translate to another language).
+    # For these, the response MUST be in the EXACT same language + script as the
+    # input — including Romanized forms (Hinglish, Tanglish, Tenglish, Manglish,
+    # Banglish, Spanglish, etc.). Models often default to "clean" English even
+    # when the input is Hinglish/Hindi/Kannada, so we prepend an aggressive
+    # language-lock header.
+    PRESERVING_TOOLS = {
+        "tone", "smart_reply", "paraphrase", "summarize",
+        "longer", "shorter", "enhance", "email", "versify", "describe",
+    }
+    if tool in PRESERVING_TOOLS:
+        lock = (
+            "================ LANGUAGE LOCK (HIGHEST PRIORITY) ================\n"
+            "Before answering, FIRST detect the language AND script of the user's input:\n"
+            "  • Pure English script + English words → respond in ENGLISH (Latin script).\n"
+            "  • Pure Devanagari (हिन्दी) script → respond in DEVANAGARI HINDI.\n"
+            "  • Pure Kannada / Tamil / Telugu / Bengali / Gujarati / Punjabi / Malayalam / Marathi etc. native script → respond in the SAME native script.\n"
+            "  • Roman-script Indian language (Hinglish, Tanglish, Tenglish, Manglish, Banglish, Singlish, Konglish, Spanglish) → respond in the SAME romanized form. "
+            "Do NOT convert Hinglish to Devanagari Hindi. Do NOT convert Hinglish to pure English. Keep the Roman script and the mixed vocabulary.\n"
+            "  • Any other language (Spanish, French, Arabic, Chinese, etc.) → respond in that exact language + script.\n"
+            "\n"
+            "MIRROR THE INPUT EXACTLY: same language family, same script, same register (slang stays slang). "
+            "Never silently translate or normalise. If you cannot do the task in the input's language, "
+            "still attempt it in that language rather than switching to English.\n"
+            "===================================================================\n\n"
+        )
+        prompt = lock + prompt
+    return prompt
 
 
 # =====================================================
