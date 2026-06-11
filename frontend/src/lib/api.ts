@@ -48,35 +48,15 @@ async function request<T = any>(
 }
 
 export const api = {
-  exchangeSession: (session_id: string) =>
-    request<{ session_token: string; user: any }>("/auth/session", {
-      method: "POST",
-      body: { session_id },
-    }),
   guest: (device_id?: string) =>
     request<{ session_token: string; user: any }>("/auth/guest", {
       method: "POST",
       body: { device_id },
     }),
-  register: (name: string, email: string, password: string) =>
-    request<{ session_token: string; user: any }>("/auth/register", {
-      method: "POST",
-      body: { name, email, password },
-    }),
-  emailLogin: (email: string, password: string) =>
-    request<{ session_token: string; user: any }>("/auth/login", {
-      method: "POST",
-      body: { email, password },
-    }),
   googleLogin: (id_token: string) =>
     request<{ session_token: string; user: any }>("/auth/google", {
       method: "POST",
       body: { id_token },
-    }),
-  adminLogin: (email: string, password: string) =>
-    request<{ session_token: string; user: any }>("/auth/admin", {
-      method: "POST",
-      body: { email, password },
     }),
   me: () => request<{ user: any }>("/auth/me", { auth: true }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST", auth: true }),

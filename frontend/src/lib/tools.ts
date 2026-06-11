@@ -18,7 +18,7 @@ export const TOOLS: ToolDef[] = [
     label: "Tone",
     icon: "color-palette",
     description: "Change the tone of your text",
-    accent: "orange",
+    accent: "lilac",
     options: [{ key: "tone", label: "Tone", choices: ["Professional", "Casual", "Formal", "Friendly", "Assertive", "Polite", "Humorous"] }],
   },
   { id: "smart_reply", label: "Smart Reply", icon: "chatbubble-ellipses", description: "3 contextual reply options", accent: "yellow", multi: true },

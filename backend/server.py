@@ -84,12 +84,6 @@ class GuestAuth(BaseModel):
     device_id: Optional[str] = None
 
 
-class RegisterRequest(BaseModel):
-    name: str
-    email: str
-    password: str
-
-
 class EmailLoginRequest(BaseModel):
     email: str
     password: str
@@ -470,52 +464,6 @@ async def create_guest(body: Optional[GuestAuth] = None):
         }
     )
     return {"session_token": token, "user": _user_public(user)}
-
-
-@api.post("/auth/register")
-async def register(body: RegisterRequest):
-    email = (body.email or "").lower().strip()
-    name = (body.name or "").strip()
-    if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
-        raise HTTPException(status_code=400, detail="Enter a valid email address")
-    if not name:
-        raise HTTPException(status_code=400, detail="Enter your name")
-    if len(body.password or "") < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-    if email == ADMIN_EMAIL:
-        raise HTTPException(status_code=400, detail="This email cannot be registered")
-
-    existing = await db.users.find_one({"email": email}, {"_id": 0})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email is already registered. Sign in instead.")
-
-    user_id = f"user_{uuid.uuid4().hex[:12]}"
-    user = {
-        "user_id": user_id,
-        "email": email,
-        "name": name,
-        "picture": None,
-        "is_guest": False,
-        "is_admin": False,
-        "is_premium": False,
-        "auth_provider": "password",
-        "password_hash": pwd_context.hash(body.password),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.users.insert_one(dict(user))
-
-    token = uuid.uuid4().hex
-    await db.user_sessions.insert_one(
-        {
-            "session_token": token,
-            "user_id": user_id,
-            "created_at": datetime.now(timezone.utc),
-            "expires_at": datetime.now(timezone.utc) + timedelta(days=30),
-        }
-    )
-    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    user_doc = await _ensure_whitelist_sync(user_doc)
-    return {"session_token": token, "user": _user_public(user_doc)}
 
 
 @api.post("/auth/login")

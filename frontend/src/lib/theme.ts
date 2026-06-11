@@ -1,6 +1,6 @@
-// KeyMind AI design tokens — Neo-Brutalist + Pastel
+// KeyMind AI design tokens — Neo-Brutalist, indigo primary on clean white
 export const COLORS = {
-  bg: "#FFFDF9",
+  bg: "#F8F9FB",
   bgDark: "#121212",
   surface: "#FFFFFF",
   surfaceDark: "#1C1C1C",
@@ -11,7 +11,8 @@ export const COLORS = {
   borderSoft: "#E5E5E5",
 
   // Accents
-  primary: "#FF9F1C",     // orange
+  primary: "#4F46E5",     // indigo
+  onPrimary: "#FFFFFF",   // text/icons placed on primary
   secondary: "#FFD166",   // butter yellow
   mint: "#A7F3D0",
   peach: "#FFDAB9",

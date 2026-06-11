@@ -137,3 +137,9 @@ Testing: iteration_10 — backend 13/13 pytest pass (`/app/backend/tests/test_it
 - Client ID: 241457285059-0f2oc6cvu40uakmp61dejr9ac5vifvdm.apps.googleusercontent.com (user-provided, Web type).
 - CAVEATS: (1) Full login needs the user's Google account; if OAuth consent screen is in Testing mode, the Google account must be added as test user. (2) On native Expo Go preview, web-client flows may fail — works on web preview; APK build will need an Android client ID (package name + SHA-1). (3) Preview URL must be in Authorized JavaScript origins + redirect URIs in Google Console.
 - Regression: email login, guest device reuse re-verified post-change.
+
+## Changelog — 2026-02 (part 6: indigo theme + Google-only login)
+1. **Theme**: COLORS.primary orange→indigo #4F46E5, bg → #F8F9FB, new COLORS.onPrimary (#FFF). Contrast fixes: splash logo text, settings Go-Premium card, tab active icon (white on indigo pill), write-tab avatar initial, login logo. Tone tool accent orange→lilac. Accent label "Orange"→"Indigo" (storage key unchanged).
+2. **Google-only login**: login.tsx rewritten — Google button (white, light-indigo border, colored G) + indigo "Continue as Guest". Email/password UI REMOVED. Backend /auth/register endpoint REMOVED (no manual account creation). /auth/login + /auth/admin remain API-only (admin/legacy accounts). AuthContext/api.ts pruned (removed exchangeSession, register, emailLogin, adminLogin, signInWithSessionId, signInAsAdmin).
+3. Tests updated: tests/test_iter10_auth_and_guest.py — 11/11 pass (register 404, login API, google invalid-token 401, guest device reuse, session usage).
+4. NOTE: User successfully completed a REAL Google login earlier (POST /api/auth/google 200 in logs).

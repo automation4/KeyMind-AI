@@ -8,7 +8,7 @@ import { useTheme } from "@/src/contexts/ThemeContext";
 import { COLORS } from "@/src/lib/theme";
 
 export default function TabsLayout() {
-  const { bg, text, accentColor } = useTheme();
+  const { bg, accentColor } = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -29,7 +29,7 @@ export default function TabsLayout() {
           paddingBottom: insets.bottom,
           paddingTop: 0,
         },
-        tabBarActiveTintColor: text,
+        tabBarActiveTintColor: COLORS.onPrimary,
         tabBarInactiveTintColor: "#8A8A8A",
         tabBarIcon: ({ color, focused }) => {
           const map: Record<string, keyof typeof Ionicons.glyphMap> = {

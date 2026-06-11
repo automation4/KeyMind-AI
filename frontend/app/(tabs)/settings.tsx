@@ -217,7 +217,7 @@ export default function SettingsScreen() {
               <Text style={styles.proTitle}>Go Premium</Text>
               <Text style={styles.proSub}>From ₹250/week · Cancel anytime</Text>
             </View>
-            <Ionicons name="arrow-forward-circle" size={36} color={COLORS.text} />
+            <Ionicons name="arrow-forward-circle" size={36} color={COLORS.onPrimary} />
           </TouchableOpacity>
         )}
 
@@ -466,9 +466,9 @@ const styles = StyleSheet.create({
     marginTop: 16, padding: 18, borderRadius: RADIUS.lg, borderWidth: 3, borderColor: COLORS.border,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center", ...SHADOW.brutal,
   },
-  proEyebrow: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1.5 },
-  proTitle: { marginTop: 4, fontSize: 24, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -1 },
-  proSub: { marginTop: 2, fontSize: 13, fontWeight: FONT.bold, color: COLORS.text },
+  proEyebrow: { fontSize: 11, fontWeight: FONT.black, color: COLORS.onPrimary, letterSpacing: 1.5 },
+  proTitle: { marginTop: 4, fontSize: 24, fontWeight: FONT.black, color: COLORS.onPrimary, letterSpacing: -1 },
+  proSub: { marginTop: 2, fontSize: 13, fontWeight: FONT.bold, color: COLORS.onPrimary },
 
   subCard: {
     marginTop: 16, padding: 16, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border,

@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...SHADOW.brutalSm,
   },
-  avatarText: { fontSize: 18, fontWeight: FONT.black, color: COLORS.text },
+  avatarText: { fontSize: 18, fontWeight: FONT.black, color: COLORS.onPrimary },
   section: {
     fontSize: 11,
     fontWeight: FONT.black,

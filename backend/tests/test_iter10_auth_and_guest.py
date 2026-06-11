@@ -1,6 +1,6 @@
 """
-Iteration 10 backend tests — email register/login, guest device persistence,
-admin email/password login through normal form, /auth/me + /api/ai/tool with session.
+Auth backend tests (Google-only model) — register endpoint removed,
+guest device persistence, admin login via API, /auth/me + /api/ai/tool with session.
 """
 import os
 import uuid
@@ -14,45 +14,17 @@ EXISTING_USER_EMAIL = "testuser@keymind.app"
 EXISTING_USER_PASSWORD = "testpass123"
 
 
-# ---------- Email register ----------
-class TestRegister:
-    def test_register_success(self):
-        email = f"test_iter10_{uuid.uuid4().hex[:8]}@keymind.app"
+# ---------- Manual account creation removed ----------
+class TestRegisterRemoved:
+    def test_register_endpoint_gone(self):
         r = requests.post(f"{BASE_URL}/api/auth/register",
-                          json={"name": "Iter10 User", "email": email, "password": "testpass123"})
-        assert r.status_code == 200, r.text
-        data = r.json()
-        assert "session_token" in data and data["session_token"]
-        assert data["user"]["email"] == email
-        assert data["user"]["is_admin"] is False
-        assert data["user"].get("is_guest") in (False, None)
-
-        # session token works
-        me = requests.get(f"{BASE_URL}/api/auth/me",
-                         headers={"Authorization": f"Bearer {data['session_token']}"})
-        assert me.status_code == 200
-        assert me.json()["user"]["email"] == email
-
-    def test_register_duplicate_email(self):
-        r = requests.post(f"{BASE_URL}/api/auth/register",
-                          json={"name": "Dup", "email": EXISTING_USER_EMAIL, "password": "testpass123"})
-        assert r.status_code == 400
-
-    def test_register_short_password(self):
-        r = requests.post(f"{BASE_URL}/api/auth/register",
-                          json={"name": "Short", "email": f"short_{uuid.uuid4().hex[:6]}@x.com", "password": "abc"})
-        assert r.status_code == 400
-        assert "8" in r.json().get("detail", "")
-
-    def test_register_admin_email_blocked(self):
-        r = requests.post(f"{BASE_URL}/api/auth/register",
-                          json={"name": "Hax", "email": ADMIN_EMAIL, "password": "testpass123"})
-        assert r.status_code == 400
+                          json={"name": "X", "email": f"x_{uuid.uuid4().hex[:6]}@y.com", "password": "testpass123"})
+        assert r.status_code in (404, 405), r.text
 
 
-# ---------- Email login ----------
+# ---------- Email login (API only — legacy/admin accounts) ----------
 class TestLogin:
-    def test_login_success(self):
+    def test_login_existing_account(self):
         r = requests.post(f"{BASE_URL}/api/auth/login",
                           json={"email": EXISTING_USER_EMAIL, "password": EXISTING_USER_PASSWORD})
         assert r.status_code == 200, r.text
@@ -71,7 +43,7 @@ class TestLogin:
                           json={"email": f"noone_{uuid.uuid4().hex[:6]}@x.com", "password": "whatever1"})
         assert r.status_code == 401
 
-    def test_admin_login_via_email_form(self):
+    def test_admin_login(self):
         r = requests.post(f"{BASE_URL}/api/auth/login",
                           json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
         assert r.status_code == 200, r.text
@@ -79,6 +51,14 @@ class TestLogin:
         assert data["session_token"]
         assert data["user"]["is_admin"] is True
         assert data["user"]["is_premium"] is True
+
+
+# ---------- Google auth endpoint ----------
+class TestGoogleAuth:
+    def test_invalid_token_rejected(self):
+        r = requests.post(f"{BASE_URL}/api/auth/google", json={"id_token": "not-a-real-token"})
+        assert r.status_code == 401
+        assert "Invalid" in r.json().get("detail", "")
 
 
 # ---------- Guest device persistence ----------
@@ -113,9 +93,8 @@ class TestGuestDevice:
 class TestSessionUsage:
     @pytest.fixture(scope="class")
     def session_token(self):
-        email = f"sess_{uuid.uuid4().hex[:8]}@keymind.app"
-        r = requests.post(f"{BASE_URL}/api/auth/register",
-                          json={"name": "Sess", "email": email, "password": "testpass123"})
+        r = requests.post(f"{BASE_URL}/api/auth/guest",
+                          json={"device_id": f"TEST_DEV_{uuid.uuid4().hex[:12]}"})
         assert r.status_code == 200
         return r.json()["session_token"]
 
@@ -133,8 +112,6 @@ class TestSessionUsage:
             headers={"Authorization": f"Bearer {session_token}"},
             json={"tool": "grammar", "text": "i has went to store yesterday"},
         )
-        # Tool must work (200) for a fresh user (within free quota)
         assert r.status_code == 200, r.text
         data = r.json()
-        # The endpoint should return some result text (key name varies)
         assert any(k in data for k in ("result", "output", "text", "corrected", "response", "suggestions", "data"))

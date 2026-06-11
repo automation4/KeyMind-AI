@@ -14,7 +14,7 @@ const LANGUAGES = [
 ];
 
 const ACCENTS: { id: AccentName; color: string; label: string }[] = [
-  { id: "orange", color: COLORS.primary, label: "Orange" },
+  { id: "orange", color: COLORS.primary, label: "Indigo" },
   { id: "yellow", color: COLORS.secondary, label: "Butter" },
   { id: "mint", color: COLORS.mint, label: "Mint" },
   { id: "peach", color: COLORS.peach, label: "Peach" },

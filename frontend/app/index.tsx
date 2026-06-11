@@ -47,7 +47,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.bg,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 52,
     fontWeight: FONT.black,
-    color: COLORS.text,
+    color: COLORS.onPrimary,
     letterSpacing: -2,
   },
   title: {

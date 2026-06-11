@@ -5,10 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
-  TextInput,
-  KeyboardAvoidingView,
-  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
@@ -23,7 +19,7 @@ import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const GoogleLogo = ({ size = 20 }: { size?: number }) => (
+const GoogleLogo = ({ size = 22 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 48 48">
     <Path
       fill="#EA4335"
@@ -45,22 +41,10 @@ const GoogleLogo = ({ size = 20 }: { size?: number }) => (
 );
 
 export default function Login() {
-  const {
-    signInAsGuest,
-    signInWithGoogleIdToken,
-    signInWithEmail,
-    signUpWithEmail,
-    user,
-    loading,
-  } = useAuth();
+  const { signInAsGuest, signInWithGoogleIdToken, user, loading } = useAuth();
   const router = useRouter();
-  const [busy, setBusy] = useState<"google" | "guest" | "email" | null>(null);
+  const [busy, setBusy] = useState<"google" | "guest" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
 
   // Real Google OAuth — opens the genuine Google account chooser.
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -130,224 +114,86 @@ export default function Login() {
     }
   };
 
-  const handleSubmit = async () => {
-    setError(null);
-    const e = email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-      setError("Enter a valid email address.");
-      return;
-    }
-    if (!password) {
-      setError("Enter your password.");
-      return;
-    }
-    if (mode === "signup") {
-      if (!name.trim()) {
-        setError("Enter your name.");
-        return;
-      }
-      if (password.length < 8) {
-        setError("Password must be at least 8 characters.");
-        return;
-      }
-    }
-    setBusy("email");
-    try {
-      if (mode === "signup") {
-        await signUpWithEmail(name.trim(), e, password);
-      } else {
-        // Backend decides account type (regular / admin) — no credentials live in the app.
-        await signInWithEmail(e, password);
-      }
-      const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
-      router.replace(setupDone ? "/(tabs)" : "/setup");
-    } catch (err: any) {
-      setError(err?.detail || err?.message || "Something went wrong. Try again.");
-      setBusy(null);
-    }
-  };
-
-  const isSignup = mode === "signup";
-
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+      <View style={styles.header}>
+        <View style={styles.logoBlock} testID="login-logo">
+          <Text style={styles.logoText}>KM</Text>
+        </View>
+      </View>
+
+      <View style={styles.body}>
+        <Text style={styles.title}>Welcome to{"\n"}KeyMind AI</Text>
+        <Text style={styles.subtitle}>
+          Sign in with your Google account to unlock multilingual grammar
+          correction, 13 AI writing tools and your personal writing tutor.
+        </Text>
+
+        {error ? (
+          <Text style={styles.error} testID="login-error">
+            {error}
+          </Text>
+        ) : null}
+
+        <View style={{ flex: 1 }} />
+
+        {/* Google sign-in — the only account login */}
+        <TouchableOpacity
+          style={[styles.googleBtn, (busy === "google" || !googleRequest) && styles.btnDisabled]}
+          onPress={handleGoogle}
+          disabled={!!busy || !googleRequest}
+          testID="login-google-btn"
         >
-          <View style={styles.header}>
-            <View style={styles.logoBlock} testID="login-logo">
-              <Text style={styles.logoText}>KM</Text>
-            </View>
-          </View>
+          {busy === "google" ? (
+            <ActivityIndicator color={COLORS.text} size="small" />
+          ) : (
+            <>
+              <GoogleLogo size={22} />
+              <Text style={styles.googleBtnText}>Continue with Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
-          <View style={styles.body}>
-            <Text style={styles.title}>
-              {isSignup ? "Create\naccount" : "Welcome to\nKeyMind AI"}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isSignup
-                ? "Join KeyMind for multilingual grammar correction, 13 AI writing tools and your personal writing tutor."
-                : "Sign in to unlock multilingual grammar correction, 13 AI writing tools and your personal writing tutor."}
-            </Text>
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
-            {error ? <Text style={styles.error} testID="login-error">{error}</Text> : null}
+        {/* Guest */}
+        <TouchableOpacity
+          style={[styles.guestBtn, busy === "guest" && styles.btnDisabled]}
+          onPress={handleGuest}
+          disabled={!!busy}
+          testID="login-guest-btn"
+        >
+          {busy === "guest" ? (
+            <ActivityIndicator color={COLORS.onPrimary} />
+          ) : (
+            <>
+              <Ionicons name="person-outline" size={18} color={COLORS.onPrimary} />
+              <Text style={styles.guestBtnText}>Continue as Guest</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
-            {/* Email / password form */}
-            <View style={styles.form}>
-              {isSignup && (
-                <>
-                  <Text style={styles.fieldLabel}>NAME</Text>
-                  <TextInput
-                    value={name}
-                    onChangeText={(v) => {
-                      setName(v);
-                      if (error) setError(null);
-                    }}
-                    placeholder="Your name"
-                    placeholderTextColor={COLORS.textMuted}
-                    autoCapitalize="words"
-                    style={styles.input}
-                    testID="login-name-input"
-                  />
-                </>
-              )}
-              <Text style={[styles.fieldLabel, isSignup && { marginTop: 14 }]}>EMAIL</Text>
-              <TextInput
-                value={email}
-                onChangeText={(v) => {
-                  setEmail(v);
-                  if (error) setError(null);
-                }}
-                placeholder="you@example.com"
-                placeholderTextColor={COLORS.textMuted}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoCorrect={false}
-                style={styles.input}
-                testID="login-email-input"
-              />
-              <Text style={[styles.fieldLabel, { marginTop: 14 }]}>PASSWORD</Text>
-              <View style={styles.passwordRow}>
-                <TextInput
-                  value={password}
-                  onChangeText={(v) => {
-                    setPassword(v);
-                    if (error) setError(null);
-                  }}
-                  placeholder="••••••••"
-                  placeholderTextColor={COLORS.textMuted}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  style={[styles.input, { flex: 1 }]}
-                  testID="login-password-input"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword((v) => !v)}
-                  style={styles.eyeBtn}
-                  testID="login-toggle-password"
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={20}
-                    color={COLORS.text}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.primaryBtn, busy === "email" && styles.btnDisabled]}
-                onPress={handleSubmit}
-                disabled={!!busy}
-                testID="login-submit-btn"
-              >
-                {busy === "email" ? (
-                  <ActivityIndicator color={COLORS.bg} />
-                ) : (
-                  <Text style={styles.primaryBtnText}>
-                    {isSignup ? "CREATE ACCOUNT" : "SIGN IN"}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setMode(isSignup ? "signin" : "signup");
-                  setError(null);
-                }}
-                style={styles.switchModeBtn}
-                testID="login-switch-mode"
-              >
-                <Text style={styles.switchModeText}>
-                  {isSignup ? "Already have an account? Sign in" : "Create new account"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Social login — Google only */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.googleBtn, (busy === "google" || !googleRequest) && styles.btnDisabled]}
-              onPress={handleGoogle}
-              disabled={!!busy || !googleRequest}
-              testID="login-google-btn"
-            >
-              {busy === "google" ? (
-                <ActivityIndicator color={COLORS.text} size="small" />
-              ) : (
-                <>
-                  <GoogleLogo size={20} />
-                  <Text style={styles.googleBtnText}>Continue with Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Guest */}
-            <TouchableOpacity
-              style={[styles.guestBtn, busy === "guest" && styles.btnDisabled]}
-              onPress={handleGuest}
-              disabled={!!busy}
-              testID="login-guest-btn"
-            >
-              {busy === "guest" ? (
-                <ActivityIndicator color={COLORS.text} />
-              ) : (
-                <>
-                  <Ionicons name="person-outline" size={18} color={COLORS.text} />
-                  <Text style={styles.guestBtnText}>CONTINUE AS GUEST</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <Text style={styles.tos}>
-              By continuing you agree to our{"\n"}
-              <Text style={{ fontWeight: FONT.bold }}>Terms of Service</Text> and{" "}
-              <Text style={{ fontWeight: FONT.bold }}>Privacy Policy</Text>.
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <Text style={styles.tos}>
+          By continuing you agree to our{"\n"}
+          <Text style={{ fontWeight: FONT.bold }}>Terms of Service</Text> and{" "}
+          <Text style={{ fontWeight: FONT.bold }}>Privacy Policy</Text>.
+        </Text>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg, padding: 24 },
-  header: { alignItems: "center", marginTop: 12 },
+  header: { alignItems: "center", marginTop: 32 },
   logoBlock: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
+    width: 84,
+    height: 84,
+    borderRadius: 22,
     backgroundColor: COLORS.primary,
     borderWidth: 3,
     borderColor: COLORS.border,
@@ -355,78 +201,53 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...SHADOW.brutal,
   },
-  logoText: { fontSize: 30, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -2 },
-  body: { flex: 1, paddingTop: 18 },
-  title: { fontSize: 34, fontWeight: FONT.black, letterSpacing: -1.5, color: COLORS.text, lineHeight: 38 },
-  subtitle: { marginTop: 10, fontSize: 14, lineHeight: 21, color: COLORS.textMuted, fontWeight: FONT.regular },
-  error: { marginTop: 14, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13 },
-
-  form: {
-    marginTop: 20, padding: 16, borderRadius: RADIUS.lg,
-    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surface,
-    ...SHADOW.brutalSm,
+  logoText: { fontSize: 34, fontWeight: FONT.black, color: COLORS.onPrimary, letterSpacing: -2 },
+  body: { flex: 1, paddingTop: 28 },
+  title: {
+    fontSize: 36,
+    fontWeight: FONT.black,
+    letterSpacing: -1.5,
+    color: COLORS.text,
+    lineHeight: 40,
+    textAlign: "center",
   },
-  fieldLabel: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted, marginBottom: 6 },
-  input: {
-    backgroundColor: COLORS.bg,
-    borderWidth: 2, borderColor: COLORS.border, borderRadius: RADIUS.md,
-    paddingHorizontal: 12, paddingVertical: 12,
-    fontSize: 15, color: COLORS.text, fontWeight: FONT.bold,
+  subtitle: {
+    marginTop: 12,
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLORS.textMuted,
+    fontWeight: FONT.regular,
+    textAlign: "center",
   },
-  passwordRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  eyeBtn: {
-    width: 46, height: 46, borderRadius: RADIUS.md,
-    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.bg,
-    alignItems: "center", justifyContent: "center",
-  },
-  primaryBtn: {
-    marginTop: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.text,
-    borderWidth: 3,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.lg,
-    paddingVertical: 16,
-    ...SHADOW.brutal,
-  },
-  primaryBtnText: { fontSize: 14, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.bg },
-  switchModeBtn: { marginTop: 14, alignItems: "center" },
-  switchModeText: { fontSize: 13, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.3 },
-
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 24 },
-  dividerLine: { flex: 1, height: 2, backgroundColor: COLORS.borderSoft },
-  dividerText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 0.5 },
+  error: { marginTop: 16, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13, textAlign: "center" },
 
   googleBtn: {
-    marginTop: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 12,
     backgroundColor: COLORS.surface,
-    borderWidth: 2,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: "#A5B4FC",
     borderRadius: RADIUS.lg,
-    paddingVertical: 15,
-    ...SHADOW.brutalSm,
+    paddingVertical: 16,
   },
-  googleBtnText: { fontSize: 14, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.3 },
+  googleBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.text, letterSpacing: 0.2 },
+
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 18 },
+  dividerLine: { flex: 1, height: 1.5, backgroundColor: COLORS.borderSoft },
+  dividerText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 2 },
 
   guestBtn: {
-    marginTop: 22,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: COLORS.surface,
-    borderWidth: 2,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.lg,
-    paddingVertical: 14,
-    ...SHADOW.brutalSm,
+    paddingVertical: 16,
   },
-  guestBtnText: { fontSize: 13, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text },
+  guestBtnText: { fontSize: 15, fontWeight: FONT.semi, color: COLORS.onPrimary, letterSpacing: 0.2 },
   btnDisabled: { opacity: 0.6 },
-  tos: { marginTop: 20, fontSize: 12, color: COLORS.textMuted, textAlign: "center", lineHeight: 18 },
+  tos: { marginTop: 22, fontSize: 12, color: COLORS.textMuted, textAlign: "center", lineHeight: 18 },
 });
