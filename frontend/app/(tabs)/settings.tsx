@@ -10,6 +10,8 @@ import {
   Alert,
   Platform,
   Switch,
+  Share,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -138,6 +140,29 @@ export default function SettingsScreen() {
     setPattern(p);
   };
 
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message:
+          "Check out KeyMind AI Keyboard — my AI writing co-pilot for grammar, translation & more! https://keymind.app",
+      });
+    } catch {
+      // user dismissed or share unsupported — ignore
+    }
+  };
+
+  const handleFeatureRequest = () => {
+    Linking.openURL(
+      "mailto:himthegreat@gmail.com?subject=KeyMind%20Feature%20Request&body=Hi%20KeyMind%20team%2C%0A%0AI%20would%20love%20to%20see%3A%20",
+    ).catch(() => {});
+  };
+
+  const handleReview = () => {
+    Linking.openURL("https://play.google.com/store/apps/details?id=com.keymind.app").catch(
+      () => {},
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <PatternBackground />
@@ -175,6 +200,35 @@ export default function SettingsScreen() {
               )}
             </View>
           </View>
+        </View>
+
+        {/* Account details — list rows like Name / Email / Subscription */}
+        <View style={styles.listCard} testID="account-list-card">
+          <View style={styles.listRow}>
+            <Text style={styles.listRowLabel}>Name</Text>
+            <Text style={styles.listRowValue} numberOfLines={1} testID="settings-row-name">
+              {user?.name || "Guest"}
+            </Text>
+          </View>
+          <View style={styles.listDivider} />
+          <View style={styles.listRow}>
+            <Text style={styles.listRowLabel}>Email</Text>
+            <Text style={styles.listRowValue} numberOfLines={1} testID="settings-row-email">
+              {user?.email || "—"}
+            </Text>
+          </View>
+          <View style={styles.listDivider} />
+          <TouchableOpacity
+            style={styles.listRow}
+            onPress={() => router.push("/pricing")}
+            testID="settings-row-subscription"
+          >
+            <Text style={styles.listRowLabel}>Subscription</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Text style={styles.listRowValue}>{isPremium ? "Premium" : "Basic"}</Text>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Usage card (only when daily limit applies, i.e. not ad-free) */}
@@ -416,6 +470,35 @@ export default function SettingsScreen() {
           </Text>
         )}
 
+        {/* Share / feedback / review */}
+        <Text style={styles.section}>SUPPORT KEYMIND</Text>
+        <View style={styles.listCard} testID="support-list-card">
+          <TouchableOpacity style={styles.listRow} onPress={handleShare} testID="settings-share-btn">
+            <View style={styles.listIconWrap}>
+              <Ionicons name="share-outline" size={18} color={COLORS.text} />
+            </View>
+            <Text style={styles.listRowTitle}>Share KeyMind</Text>
+          </TouchableOpacity>
+          <View style={styles.listDivider} />
+          <TouchableOpacity
+            style={styles.listRow}
+            onPress={handleFeatureRequest}
+            testID="settings-feature-request-btn"
+          >
+            <View style={styles.listIconWrap}>
+              <Ionicons name="bulb-outline" size={18} color={COLORS.text} />
+            </View>
+            <Text style={styles.listRowTitle}>Request a Feature</Text>
+          </TouchableOpacity>
+          <View style={styles.listDivider} />
+          <TouchableOpacity style={styles.listRow} onPress={handleReview} testID="settings-review-btn">
+            <View style={styles.listIconWrap}>
+              <Ionicons name="star-outline" size={18} color={COLORS.text} />
+            </View>
+            <Text style={styles.listRowTitle}>Review on the Play Store</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={async () => {
           await signOut();
@@ -523,6 +606,38 @@ const styles = StyleSheet.create({
   },
   patternLabel: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.3 },
   patternHint: { marginTop: 10, fontSize: 11, color: COLORS.textMuted, fontWeight: FONT.bold },
+
+  // Grouped list rows (Name / Email / Subscription, Share / Feature / Review)
+  listCard: {
+    marginTop: 14,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 16,
+    ...SHADOW.brutalSm,
+  },
+  listRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 15,
+    gap: 10,
+  },
+  listRowLabel: { fontSize: 14, fontWeight: FONT.bold, color: COLORS.text },
+  listRowValue: { fontSize: 13, fontWeight: FONT.regular, color: COLORS.textMuted, flexShrink: 1 },
+  listRowTitle: { flex: 1, fontSize: 14, fontWeight: FONT.bold, color: COLORS.text },
+  listDivider: { height: 1.5, backgroundColor: COLORS.borderSoft },
+  listIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: COLORS.bg,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   // Admin panel
   adminCard: {
