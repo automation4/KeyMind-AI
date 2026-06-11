@@ -2,8 +2,10 @@
 export const COLORS = {
   bg: "#F8F9FB",
   bgDark: "#121212",
+  bgMatte: "#2E2E33",
   surface: "#FFFFFF",
   surfaceDark: "#1C1C1C",
+  surfaceMatte: "#3B3B41",
   text: "#0F0F0F",
   textMuted: "#525252",
   textInverse: "#F5F5F5",

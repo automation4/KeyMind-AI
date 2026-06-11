@@ -19,8 +19,9 @@ import { useRouter } from "expo-router";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { useTheme, AccentName, PatternName } from "@/src/contexts/ThemeContext";
+import { useTheme, AccentName, PatternName, ThemeMode } from "@/src/contexts/ThemeContext";
 import { PatternBackground, PatternSvg, PATTERNS } from "@/src/components/PatternBackground";
+import { AccentColorPicker } from "@/src/components/AccentColorPicker";
 import { api } from "@/src/lib/api";
 
 type AccentDef = { id: AccentName; color: string };
@@ -46,8 +47,9 @@ type WhitelistEntry = {
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
-  const { mode, accent, pattern, setMode, setAccent, setPattern, accentColor } = useTheme();
+  const { mode, accent, customAccent, pattern, setMode, setAccent, setCustomAccent, setPattern, accentColor } = useTheme();
   const router = useRouter();
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
   const isPremium = !!(user?.is_premium || user?.is_admin);
   const isAdmin = !!user?.is_admin;
@@ -388,22 +390,26 @@ export default function SettingsScreen() {
         {/* Theme */}
         <Text style={styles.section}>THEME</Text>
         <View style={styles.row}>
-          {(["light", "dark"] as const).map((m) => (
+          {(
+            [
+              { id: "light", label: "Light", icon: "sunny", bg: COLORS.bg, fg: COLORS.text },
+              { id: "matte", label: "Matte", icon: "contrast", bg: COLORS.bgMatte, fg: COLORS.textInverse },
+              { id: "dark", label: "Dark", icon: "moon", bg: COLORS.bgDark, fg: COLORS.textInverse },
+            ] as { id: ThemeMode; label: string; icon: any; bg: string; fg: string }[]
+          ).map((m) => (
             <TouchableOpacity
-              key={m}
-              onPress={() => setMode(m)}
+              key={m.id}
+              onPress={() => setMode(m.id)}
               style={[
                 styles.themeCard,
-                { backgroundColor: m === "light" ? COLORS.bg : COLORS.bgDark },
-                mode === m && SHADOW.brutalSm,
-                mode === m && { borderColor: COLORS.border },
+                { backgroundColor: m.bg },
+                mode === m.id && SHADOW.brutalSm,
+                mode === m.id && { borderColor: COLORS.border },
               ]}
-              testID={`settings-theme-${m}`}
+              testID={`settings-theme-${m.id}`}
             >
-              <Ionicons name={m === "light" ? "sunny" : "moon"} size={24} color={m === "light" ? COLORS.text : COLORS.textInverse} />
-              <Text style={[styles.themeLabel, { color: m === "light" ? COLORS.text : COLORS.textInverse }]}>
-                {m === "light" ? "Light" : "Dark"}
-              </Text>
+              <Ionicons name={m.icon} size={24} color={m.fg} />
+              <Text style={[styles.themeLabel, { color: m.fg }]}>{m.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -418,14 +424,54 @@ export default function SettingsScreen() {
               style={[
                 styles.accent,
                 { backgroundColor: a.color },
-                accent === a.id && SHADOW.brutalSm,
+                accent === a.id && !customAccent && SHADOW.brutalSm,
               ]}
               testID={`settings-accent-${a.id}`}
             >
-              {accent === a.id && <Ionicons name="checkmark" size={20} color={COLORS.text} />}
+              {accent === a.id && !customAccent && (
+                <Ionicons name="checkmark" size={20} color={COLORS.text} />
+              )}
             </TouchableOpacity>
           ))}
+          {/* Custom color — premium */}
+          <TouchableOpacity
+            onPress={() => {
+              if (!isPremium) {
+                router.push("/pricing");
+                return;
+              }
+              setColorPickerOpen(true);
+            }}
+            style={[
+              styles.accent,
+              { backgroundColor: customAccent || COLORS.surface },
+              !!customAccent && SHADOW.brutalSm,
+            ]}
+            testID="settings-accent-custom"
+          >
+            {customAccent ? (
+              <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+            ) : (
+              <Ionicons
+                name={isPremium ? "color-palette" : "lock-closed"}
+                size={18}
+                color={COLORS.text}
+              />
+            )}
+          </TouchableOpacity>
         </View>
+        {!isPremium && (
+          <Text style={styles.patternHint}>
+            Want any color you like? The custom color picker is a Premium perk.
+          </Text>
+        )}
+
+        <AccentColorPicker
+          visible={colorPickerOpen}
+          selected={customAccent}
+          onClose={() => setColorPickerOpen(false)}
+          onPick={(hex) => setCustomAccent(hex)}
+        />
 
         {/* Background pattern — premium */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

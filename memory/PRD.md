@@ -149,3 +149,9 @@ Testing: iteration_10 — backend 13/13 pytest pass (`/app/backend/tests/test_it
   1. Account card → Name / Email / Subscription (value + chevron → /pricing), testIDs settings-row-*
   2. "SUPPORT KEYMIND" card → Share KeyMind (RN Share API), Request a Feature (mailto:himthegreat@gmail.com), Review on the Play Store (placeholder Play Store URL com.keymind.app)
 - Preview-error investigation: user reported an error during preview but gave no details. Checked: web bundle clean (no console/page errors), Android bundle compiles (1429 modules), backend logs healthy, stale lottie error in expo.err.log is from Jun 9 (pre-fork, resolved). AWAITING user's error screenshot/details.
+
+## Changelog — 2026-02 (part 8: preview crash fix + matte theme + custom accent)
+1. **Preview crash FIXED**: `WebBrowser.maybeCompleteAuthSession()` in login.tsx threw "Blocked a frame with origin… cross-origin frame" when the app runs inside the Emergent preview IFRAME. Wrapped in try/catch (no-op in iframe, normal behavior in real popups).
+2. **Theme modes**: default = light; added third mode "matte" (#2E2E33 bg / #3B3B41 surface) alongside light/dark. ThemeContext mode type + storage + settings UI (3 cards: Light/Matte/Dark).
+3. **Dark/matte footer icons**: tab icons now have inside-out borders — outer light halo ring + inner black border + subtle bg, inactive tint #E8E8E8. Clearly visible on dark bgs.
+4. **Custom accent color picker (PREMIUM)**: new AccentColorPicker modal (36-swatch HSL palette) opened from a special swatch in Settings ACCENT row; free users see lock → /pricing. ThemeContext customAccent (storage keymind_custom_accent) overrides accentColor; picking a named accent clears it.

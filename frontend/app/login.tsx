@@ -17,7 +17,12 @@ import { useAuth } from "@/src/contexts/AuthContext";
 import { storage } from "@/src/utils/storage";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
-WebBrowser.maybeCompleteAuthSession();
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch {
+  // Running inside a cross-origin iframe (e.g. the Emergent preview) —
+  // window.opener/location access is blocked there. Safe to ignore.
+}
 
 const GoogleLogo = ({ size = 22 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 48 48">
