@@ -457,7 +457,7 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 key={p.id}
                 onPress={() => pickPattern(p.id)}
-                style={[styles.patternCard, active && SHADOW.brutalSm]}
+                style={styles.patternCard}
                 testID={`settings-pattern-${p.id}`}
               >
                 <View style={styles.patternPreview}>

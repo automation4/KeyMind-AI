@@ -17,7 +17,7 @@ const STROKE = "#1A1A1A";
 /** Renders a single repeating SVG pattern as a full-bleed layer. */
 export const PatternSvg: React.FC<{ pattern: PatternName; opacity?: number }> = ({
   pattern,
-  opacity = 0.07,
+  opacity = 0.14,
 }) => {
   if (pattern === "classic") return null;
   return (
