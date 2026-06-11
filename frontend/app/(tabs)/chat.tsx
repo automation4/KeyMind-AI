@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
+import { PatternBackground } from "@/src/components/PatternBackground";
 import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
 import { MicButton } from "@/src/components/MicButton";
@@ -165,6 +166,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <PatternBackground />
       <View style={styles.header}>
         <View>
           <Text style={styles.eyebrow}>ASK AI</Text>

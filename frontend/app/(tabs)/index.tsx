@@ -16,6 +16,7 @@ import * as Haptics from "expo-haptics";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { TOOL_BY_ID, TOOLS } from "@/src/lib/tools";
 import { api } from "@/src/lib/api";
+import { PatternBackground } from "@/src/components/PatternBackground";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useTheme } from "@/src/contexts/ThemeContext";
 import { AdBanner } from "@/src/components/AdBanner";
@@ -189,6 +190,7 @@ export default function WriteScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <PatternBackground />
       {/* Header */}
       <View style={styles.header}>
         <View>

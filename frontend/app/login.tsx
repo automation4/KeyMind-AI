@@ -22,44 +22,28 @@ import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
 WebBrowser.maybeCompleteAuthSession();
 
-// Hidden admin email; if user types this, a password field appears.
+// Admin signs in with this email + admin password through the normal form.
 const ADMIN_EMAIL = "himthegreat@gmail.com";
 
 export default function Login() {
-  const { signInWithSessionId, signInAsGuest, signInAsAdmin, user, loading } = useAuth();
+  const {
+    signInWithSessionId,
+    signInAsGuest,
+    signInAsAdmin,
+    signInWithEmail,
+    signUpWithEmail,
+    user,
+    loading,
+  } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState<"google" | "guest" | "email" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showEmail, setShowEmail] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  // Hidden admin gesture: 11 quick taps on the KM logo.
-  const tapCountRef = React.useRef(0);
-  const tapResetRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const onLogoTap = () => {
-    if (showEmail) return;
-    if (tapResetRef.current) clearTimeout(tapResetRef.current);
-    tapCountRef.current += 1;
-    if (tapCountRef.current >= 22) {
-      tapCountRef.current = 0;
-      setShowEmail(true);
-      return;
-    }
-    // Reset if user pauses > 1.2s between taps
-    tapResetRef.current = setTimeout(() => {
-      tapCountRef.current = 0;
-    }, 1200);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (tapResetRef.current) clearTimeout(tapResetRef.current);
-    };
-  }, []);
-
-  const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL;
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (loading || !user || busy) return;
@@ -85,6 +69,7 @@ export default function Login() {
   const handleGoogle = async () => {
     setBusy("google");
     setError(null);
+    setInfo(null);
     try {
       const redirectUrl =
         Platform.OS === "web" ? (window.location.origin + "/") : Linking.createURL("auth");
@@ -117,6 +102,7 @@ export default function Login() {
   const handleGuest = async () => {
     setBusy("guest");
     setError(null);
+    setInfo(null);
     try {
       await signInAsGuest();
       router.replace("/setup");
@@ -126,35 +112,48 @@ export default function Login() {
     }
   };
 
-  const handleEmailContinue = async () => {
+  const handleSubmit = async () => {
     setError(null);
+    setInfo(null);
     const e = email.trim().toLowerCase();
-    if (!e) {
-      setError("Enter your email.");
-      return;
-    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
       setError("Enter a valid email address.");
       return;
     }
-    if (e !== ADMIN_EMAIL) {
-      // Non-admin emails should use Google sign-in
-      setError("This app uses Google Sign-in. Tap CONTINUE WITH GOOGLE above.");
+    if (!password) {
+      setError("Enter your password.");
       return;
     }
-    if (!password) {
-      setError("Enter your admin password.");
-      return;
+    if (mode === "signup") {
+      if (!name.trim()) {
+        setError("Enter your name.");
+        return;
+      }
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters.");
+        return;
+      }
     }
     setBusy("email");
     try {
-      await signInAsAdmin(e, password);
+      if (mode === "signup") {
+        await signUpWithEmail(name.trim(), e, password);
+      } else if (e === ADMIN_EMAIL) {
+        await signInAsAdmin(e, password);
+      } else {
+        await signInWithEmail(e, password);
+      }
       const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
       router.replace(setupDone ? "/(tabs)" : "/setup");
     } catch (err: any) {
-      setError(err?.detail || err?.message || "Invalid credentials");
+      setError(err?.detail || err?.message || "Something went wrong. Try again.");
       setBusy(null);
     }
+  };
+
+  const comingSoon = (provider: string) => {
+    setError(null);
+    setInfo(`${provider} login is coming soon. Use Google or email for now.`);
   };
 
   useEffect(() => {
@@ -177,6 +176,8 @@ export default function Login() {
     }
   }, []);
 
+  const isSignup = mode === "signup";
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
@@ -184,46 +185,160 @@ export default function Login() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={onLogoTap}
-              style={styles.logoBlock}
-              accessibilityLabel="KeyMind logo"
-              testID="login-logo"
-            >
+            <View style={styles.logoBlock} testID="login-logo">
               <Text style={styles.logoText}>KM</Text>
-            </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.body}>
-            <Text style={styles.title}>Welcome to{"\n"}KeyMind AI</Text>
+            <Text style={styles.title}>
+              {isSignup ? "Create\naccount" : "Welcome to\nKeyMind AI"}
+            </Text>
             <Text style={styles.subtitle}>
-              Sign in to unlock multilingual grammar correction, 16 AI writing tools and your personal writing tutor.
+              {isSignup
+                ? "Join KeyMind for multilingual grammar correction, 13 AI writing tools and your personal writing tutor."
+                : "Sign in to unlock multilingual grammar correction, 13 AI writing tools and your personal writing tutor."}
             </Text>
 
             {error ? <Text style={styles.error} testID="login-error">{error}</Text> : null}
+            {info ? <Text style={styles.info} testID="login-info">{info}</Text> : null}
 
-            <TouchableOpacity
-              style={[styles.googleBtn, busy === "google" && styles.btnDisabled]}
-              onPress={handleGoogle}
-              disabled={!!busy}
-              testID="login-google-btn"
-            >
-              {busy === "google" ? (
-                <ActivityIndicator color={COLORS.text} />
-              ) : (
+            {/* Email / password form */}
+            <View style={styles.form}>
+              {isSignup && (
                 <>
-                  <Ionicons name="logo-google" size={22} color={COLORS.text} />
-                  <Text style={styles.googleBtnText}>CONTINUE WITH GOOGLE</Text>
+                  <Text style={styles.fieldLabel}>NAME</Text>
+                  <TextInput
+                    value={name}
+                    onChangeText={(v) => {
+                      setName(v);
+                      if (error) setError(null);
+                    }}
+                    placeholder="Your name"
+                    placeholderTextColor={COLORS.textMuted}
+                    autoCapitalize="words"
+                    style={styles.input}
+                    testID="login-name-input"
+                  />
                 </>
               )}
-            </TouchableOpacity>
+              <Text style={[styles.fieldLabel, isSignup && { marginTop: 14 }]}>EMAIL</Text>
+              <TextInput
+                value={email}
+                onChangeText={(v) => {
+                  setEmail(v);
+                  if (error) setError(null);
+                }}
+                placeholder="you@example.com"
+                placeholderTextColor={COLORS.textMuted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+                style={styles.input}
+                testID="login-email-input"
+              />
+              <Text style={[styles.fieldLabel, { marginTop: 14 }]}>PASSWORD</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  value={password}
+                  onChangeText={(v) => {
+                    setPassword(v);
+                    if (error) setError(null);
+                  }}
+                  placeholder="••••••••"
+                  placeholderTextColor={COLORS.textMuted}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  style={[styles.input, { flex: 1 }]}
+                  testID="login-password-input"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword((v) => !v)}
+                  style={styles.eyeBtn}
+                  testID="login-toggle-password"
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color={COLORS.text}
+                  />
+                </TouchableOpacity>
+              </View>
 
+              <TouchableOpacity
+                style={[styles.primaryBtn, busy === "email" && styles.btnDisabled]}
+                onPress={handleSubmit}
+                disabled={!!busy}
+                testID="login-submit-btn"
+              >
+                {busy === "email" ? (
+                  <ActivityIndicator color={COLORS.bg} />
+                ) : (
+                  <Text style={styles.primaryBtnText}>
+                    {isSignup ? "CREATE ACCOUNT" : "SIGN IN"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setMode(isSignup ? "signin" : "signup");
+                  setError(null);
+                  setInfo(null);
+                }}
+                style={styles.switchModeBtn}
+                testID="login-switch-mode"
+              >
+                <Text style={styles.switchModeText}>
+                  {isSignup ? "Already have an account? Sign in" : "Create new account"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Social login */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>Or continue with</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <View style={styles.socialRow}>
+              <TouchableOpacity
+                style={[styles.socialBtn, busy === "google" && styles.btnDisabled]}
+                onPress={handleGoogle}
+                disabled={!!busy}
+                testID="login-google-btn"
+              >
+                {busy === "google" ? (
+                  <ActivityIndicator color={COLORS.text} size="small" />
+                ) : (
+                  <Ionicons name="logo-google" size={24} color={COLORS.text} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.socialBtn}
+                onPress={() => comingSoon("Facebook")}
+                disabled={!!busy}
+                testID="login-facebook-btn"
+              >
+                <Ionicons name="logo-facebook" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.socialBtn}
+                onPress={() => comingSoon("Apple")}
+                disabled={!!busy}
+                testID="login-apple-btn"
+              >
+                <Ionicons name="logo-apple" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Guest */}
             <TouchableOpacity
               style={[styles.guestBtn, busy === "guest" && styles.btnDisabled]}
               onPress={handleGuest}
@@ -231,83 +346,14 @@ export default function Login() {
               testID="login-guest-btn"
             >
               {busy === "guest" ? (
-                <ActivityIndicator color={COLORS.bg} />
+                <ActivityIndicator color={COLORS.text} />
               ) : (
                 <>
-                  <Ionicons name="person-outline" size={20} color={COLORS.bg} />
+                  <Ionicons name="person-outline" size={18} color={COLORS.text} />
                   <Text style={styles.guestBtnText}>CONTINUE AS GUEST</Text>
                 </>
               )}
             </TouchableOpacity>
-
-            {/* Hidden admin form — revealed via 22 taps on KM logo. No visible toggle, no badge. */}
-            {showEmail && (
-              <View style={styles.emailForm}>
-                <Text style={styles.fieldLabel}>EMAIL</Text>
-                <TextInput
-                  value={email}
-                  onChangeText={(v) => {
-                    setEmail(v);
-                    if (error) setError(null);
-                  }}
-                  placeholder="you@example.com"
-                  placeholderTextColor={COLORS.textMuted}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoCorrect={false}
-                  style={styles.input}
-                  testID="login-email-input"
-                />
-                {isAdminEmail && (
-                  <>
-                    <Text style={[styles.fieldLabel, { marginTop: 14 }]}>PASSWORD</Text>
-                    <TextInput
-                      value={password}
-                      onChangeText={setPassword}
-                      placeholder="••••••••"
-                      placeholderTextColor={COLORS.textMuted}
-                      secureTextEntry
-                      autoCapitalize="none"
-                      style={styles.input}
-                      testID="login-password-input"
-                    />
-                  </>
-                )}
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 14 }}>
-                  <TouchableOpacity
-                    style={[styles.emailBtn, { backgroundColor: COLORS.surface }]}
-                    onPress={() => {
-                      setShowEmail(false);
-                      setEmail("");
-                      setPassword("");
-                      setError(null);
-                    }}
-                    disabled={busy === "email"}
-                    testID="login-email-cancel"
-                  >
-                    <Text style={[styles.emailBtnText, { color: COLORS.text }]}>CANCEL</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.emailBtn,
-                      { backgroundColor: COLORS.text, flex: 2 },
-                      busy === "email" && styles.btnDisabled,
-                    ]}
-                    onPress={handleEmailContinue}
-                    disabled={busy === "email"}
-                    testID="login-email-continue"
-                  >
-                    {busy === "email" ? (
-                      <ActivityIndicator color={COLORS.bg} />
-                    ) : (
-                      <Text style={[styles.emailBtnText, { color: COLORS.bg }]}>
-                        {isAdminEmail ? "SIGN IN" : "CONTINUE"}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
 
             <Text style={styles.tos}>
               By continuing you agree to our{"\n"}
@@ -323,11 +369,11 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg, padding: 24 },
-  header: { alignItems: "center", marginTop: 24 },
+  header: { alignItems: "center", marginTop: 12 },
   logoBlock: {
-    width: 88,
-    height: 88,
-    borderRadius: 22,
+    width: 72,
+    height: 72,
+    borderRadius: 20,
     backgroundColor: COLORS.primary,
     borderWidth: 3,
     borderColor: COLORS.border,
@@ -335,52 +381,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...SHADOW.brutal,
   },
-  logoText: { fontSize: 38, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -2 },
-  body: { flex: 1, justifyContent: "center", paddingTop: 16 },
-  title: { fontSize: 40, fontWeight: FONT.black, letterSpacing: -1.5, color: COLORS.text, lineHeight: 44 },
-  subtitle: { marginTop: 14, fontSize: 15, lineHeight: 22, color: COLORS.textMuted, fontWeight: FONT.regular },
-  error: { marginTop: 20, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13 },
-  googleBtn: {
-    marginTop: 28,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    backgroundColor: COLORS.surface,
-    borderWidth: 3,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.lg,
-    paddingVertical: 18,
-    ...SHADOW.brutal,
-  },
-  googleBtnText: { fontSize: 14, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text },
-  guestBtn: {
-    marginTop: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: COLORS.text,
-    borderWidth: 3,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.lg,
-    paddingVertical: 18,
-    ...SHADOW.brutal,
-  },
-  guestBtnText: { fontSize: 14, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.bg },
-  btnDisabled: { opacity: 0.6 },
-  emailForm: {
-    marginTop: 18, padding: 14, borderRadius: RADIUS.lg,
+  logoText: { fontSize: 30, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -2 },
+  body: { flex: 1, paddingTop: 18 },
+  title: { fontSize: 34, fontWeight: FONT.black, letterSpacing: -1.5, color: COLORS.text, lineHeight: 38 },
+  subtitle: { marginTop: 10, fontSize: 14, lineHeight: 21, color: COLORS.textMuted, fontWeight: FONT.regular },
+  error: { marginTop: 14, color: "#B91C1C", fontWeight: FONT.bold, fontSize: 13 },
+  info: { marginTop: 14, color: COLORS.text, fontWeight: FONT.bold, fontSize: 13 },
+
+  form: {
+    marginTop: 20, padding: 16, borderRadius: RADIUS.lg,
     borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surface,
+    ...SHADOW.brutalSm,
   },
-  adminBadgeRow: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
-    backgroundColor: COLORS.secondary, borderWidth: 2, borderColor: COLORS.border,
-    marginBottom: 10,
-  },
-  adminBadgeText: { fontSize: 10, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1.2 },
   fieldLabel: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted, marginBottom: 6 },
   input: {
     backgroundColor: COLORS.bg,
@@ -388,10 +400,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 12,
     fontSize: 15, color: COLORS.text, fontWeight: FONT.bold,
   },
-  emailBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: RADIUS.lg, alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
+  passwordRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  eyeBtn: {
+    width: 46, height: 46, borderRadius: RADIUS.md,
+    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.bg,
+    alignItems: "center", justifyContent: "center",
   },
-  emailBtnText: { fontSize: 13, fontWeight: FONT.black, letterSpacing: 1.5 },
-  tos: { marginTop: 24, fontSize: 12, color: COLORS.textMuted, textAlign: "center", lineHeight: 18 },
+  primaryBtn: {
+    marginTop: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.text,
+    borderWidth: 3,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.lg,
+    paddingVertical: 16,
+    ...SHADOW.brutal,
+  },
+  primaryBtnText: { fontSize: 14, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.bg },
+  switchModeBtn: { marginTop: 14, alignItems: "center" },
+  switchModeText: { fontSize: 13, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.3 },
+
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 24 },
+  dividerLine: { flex: 1, height: 2, backgroundColor: COLORS.borderSoft },
+  dividerText: { fontSize: 12, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 0.5 },
+
+  socialRow: { flexDirection: "row", justifyContent: "center", gap: 14, marginTop: 16 },
+  socialBtn: {
+    width: 60, height: 56, borderRadius: RADIUS.md,
+    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surface,
+    alignItems: "center", justifyContent: "center",
+    ...SHADOW.brutalSm,
+  },
+
+  guestBtn: {
+    marginTop: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.lg,
+    paddingVertical: 14,
+    ...SHADOW.brutalSm,
+  },
+  guestBtnText: { fontSize: 13, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text },
+  btnDisabled: { opacity: 0.6 },
+  tos: { marginTop: 20, fontSize: 12, color: COLORS.textMuted, textAlign: "center", lineHeight: 18 },
 });

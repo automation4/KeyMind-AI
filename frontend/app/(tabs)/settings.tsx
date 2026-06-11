@@ -17,7 +17,8 @@ import { useRouter } from "expo-router";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { useTheme, AccentName } from "@/src/contexts/ThemeContext";
+import { useTheme, AccentName, PatternName } from "@/src/contexts/ThemeContext";
+import { PatternBackground, PatternSvg, PATTERNS } from "@/src/components/PatternBackground";
 import { api } from "@/src/lib/api";
 
 type AccentDef = { id: AccentName; color: string };
@@ -43,7 +44,7 @@ type WhitelistEntry = {
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
-  const { mode, accent, setMode, setAccent, accentColor } = useTheme();
+  const { mode, accent, pattern, setMode, setAccent, setPattern, accentColor } = useTheme();
   const router = useRouter();
 
   const isPremium = !!(user?.is_premium || user?.is_admin);
@@ -129,8 +130,17 @@ export default function SettingsScreen() {
     setAccent(a.id);
   };
 
+  const pickPattern = (p: PatternName) => {
+    if (p !== "classic" && !isPremium) {
+      router.push("/pricing");
+      return;
+    }
+    setPattern(p);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <PatternBackground />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <Text style={styles.eyebrow}>YOU</Text>
         <Text style={styles.title}>Settings.</Text>
@@ -363,6 +373,49 @@ export default function SettingsScreen() {
           ))}
         </View>
 
+        {/* Background pattern — premium */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={styles.section}>BACKGROUND PATTERN</Text>
+          <View style={styles.premiumTag}>
+            <Ionicons name="diamond" size={9} color={COLORS.text} />
+            <Text style={styles.premiumTagText}>PREMIUM</Text>
+          </View>
+        </View>
+        <View style={[styles.row, { flexWrap: "wrap" }]}>
+          {PATTERNS.map((p) => {
+            const locked = p.id !== "classic" && !isPremium;
+            const active = pattern === p.id;
+            return (
+              <TouchableOpacity
+                key={p.id}
+                onPress={() => pickPattern(p.id)}
+                style={[styles.patternCard, active && SHADOW.brutalSm]}
+                testID={`settings-pattern-${p.id}`}
+              >
+                <View style={styles.patternPreview}>
+                  <PatternSvg pattern={p.id} opacity={0.35} />
+                  {locked && (
+                    <View style={styles.patternLock}>
+                      <Ionicons name="lock-closed" size={14} color={COLORS.text} />
+                    </View>
+                  )}
+                  {active && !locked && (
+                    <View style={styles.patternCheck}>
+                      <Ionicons name="checkmark" size={14} color={COLORS.bg} />
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.patternLabel}>{p.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {!isPremium && (
+          <Text style={styles.patternHint}>
+            Unlock patterns with Premium — tap any pattern to see plans.
+          </Text>
+        )}
+
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={async () => {
           await signOut();
@@ -438,6 +491,38 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: COLORS.border,
     alignItems: "center", justifyContent: "center",
   },
+
+  // Pattern themes
+  premiumTag: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    marginTop: 28, marginBottom: 10,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.secondary, borderWidth: 2, borderColor: COLORS.border,
+  },
+  premiumTagText: { fontSize: 9, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 1 },
+  patternCard: {
+    width: 86, alignItems: "center", gap: 6,
+    borderRadius: RADIUS.md,
+  },
+  patternPreview: {
+    width: 86, height: 60, borderRadius: RADIUS.md, overflow: "hidden",
+    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surface,
+    alignItems: "center", justifyContent: "center",
+  },
+  patternLock: {
+    position: "absolute",
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: COLORS.secondary, borderWidth: 2, borderColor: COLORS.border,
+    alignItems: "center", justifyContent: "center",
+  },
+  patternCheck: {
+    position: "absolute",
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: COLORS.text, borderWidth: 2, borderColor: COLORS.border,
+    alignItems: "center", justifyContent: "center",
+  },
+  patternLabel: { fontSize: 11, fontWeight: FONT.black, color: COLORS.text, letterSpacing: 0.3 },
+  patternHint: { marginTop: 10, fontSize: 11, color: COLORS.textMuted, fontWeight: FONT.bold },
 
   // Admin panel
   adminCard: {

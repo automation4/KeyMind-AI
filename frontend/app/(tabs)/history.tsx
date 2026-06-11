@@ -6,6 +6,7 @@ import { useFocusEffect } from "expo-router";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
+import { PatternBackground } from "@/src/components/PatternBackground";
 import { TOOL_BY_ID } from "@/src/lib/tools";
 import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
@@ -46,6 +47,7 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <PatternBackground />
       <View style={styles.header}>
         <View>
           <Text style={styles.eyebrow}>YOUR LOG</Text>

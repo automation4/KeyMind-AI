@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, clearToken, getToken, setToken } from "@/src/lib/api";
+import { storage } from "@/src/utils/storage";
 
 export type User = {
   user_id: string;
@@ -23,6 +24,8 @@ type AuthState = {
   signInWithSessionId: (session_id: string) => Promise<void>;
   signInAsGuest: () => Promise<void>;
   signInAsAdmin: (email: string, password: string) => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
@@ -62,9 +65,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInAsGuest = async () => {
-    const data = await api.guest();
+    // One guest account per device — persist a device id so the backend
+    // reuses the same guest user (and its usage limits) on every guest login.
+    let deviceId = await storage.getItem<string>("keymind_device_id", "");
+    if (!deviceId) {
+      deviceId = `dev_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+      await storage.setItem("keymind_device_id", deviceId);
+    }
+    const data = await api.guest(deviceId);
     await setToken(data.session_token);
     setUser({ ...(data.user as User), is_guest: true });
+  };
+
+  const signInWithEmail = async (email: string, password: string) => {
+    const data = await api.emailLogin(email, password);
+    await setToken(data.session_token);
+    setUser(data.user as User);
+  };
+
+  const signUpWithEmail = async (name: string, email: string, password: string) => {
+    const data = await api.register(name, email, password);
+    await setToken(data.session_token);
+    setUser(data.user as User);
   };
 
   const signInAsAdmin = async (email: string, password: string) => {
@@ -90,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInWithSessionId, signInAsGuest, signInAsAdmin, signOut, refreshUser }}
+      value={{ user, loading, signInWithSessionId, signInAsGuest, signInAsAdmin, signInWithEmail, signUpWithEmail, signOut, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

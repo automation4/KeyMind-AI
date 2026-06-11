@@ -53,8 +53,21 @@ export const api = {
       method: "POST",
       body: { session_id },
     }),
-  guest: () =>
-    request<{ session_token: string; user: any }>("/auth/guest", { method: "POST" }),
+  guest: (device_id?: string) =>
+    request<{ session_token: string; user: any }>("/auth/guest", {
+      method: "POST",
+      body: { device_id },
+    }),
+  register: (name: string, email: string, password: string) =>
+    request<{ session_token: string; user: any }>("/auth/register", {
+      method: "POST",
+      body: { name, email, password },
+    }),
+  emailLogin: (email: string, password: string) =>
+    request<{ session_token: string; user: any }>("/auth/login", {
+      method: "POST",
+      body: { email, password },
+    }),
   adminLogin: (email: string, password: string) =>
     request<{ session_token: string; user: any }>("/auth/admin", {
       method: "POST",

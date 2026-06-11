@@ -12,6 +12,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta, date
+from passlib.context import CryptContext
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 from emergentintegrations.llm.openai.text_to_speech import OpenAITextToSpeech
@@ -41,6 +42,9 @@ EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
 # Admin credentials (single-admin app)
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "himthegreat@gmail.com").lower().strip()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "aa$fufm2q")
+
+# Password hashing for email/password accounts
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Free-tier daily AI usage limit (any tool, any combination)
 FREE_TOOL_DAILY_LIMIT = int(os.environ.get("FREE_TOOL_DAILY_LIMIT", "10"))
@@ -76,6 +80,18 @@ class UserOut(BaseModel):
 
 class GuestAuth(BaseModel):
     name: Optional[str] = None
+    device_id: Optional[str] = None
+
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class EmailLoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class AIToolRequest(BaseModel):
@@ -356,20 +372,75 @@ async def create_session(body: SessionCreate):
 
 
 @api.post("/auth/guest")
-async def create_guest():
-    user_id = f"guest_{uuid.uuid4().hex[:12]}"
+async def create_guest(body: Optional[GuestAuth] = None):
+    device_id = (body.device_id or "").strip() if body else ""
+    user = None
+    if device_id:
+        # One guest account per device — reuse so usage limits persist.
+        user = await db.users.find_one(
+            {"guest_device_id": device_id, "is_guest": True}, {"_id": 0}
+        )
+    if not user:
+        user_id = f"guest_{uuid.uuid4().hex[:12]}"
+        user = {
+            "user_id": user_id,
+            "email": f"{user_id}@guest.local",
+            "name": "Guest",
+            "picture": None,
+            "is_guest": True,
+            "is_admin": False,
+            "is_premium": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if device_id:
+            user["guest_device_id"] = device_id
+        await db.users.insert_one(dict(user))
+        user.pop("_id", None)
     token = uuid.uuid4().hex
+    await db.user_sessions.insert_one(
+        {
+            "session_token": token,
+            "user_id": user["user_id"],
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(days=30),
+        }
+    )
+    return {"session_token": token, "user": _user_public(user)}
+
+
+@api.post("/auth/register")
+async def register(body: RegisterRequest):
+    email = (body.email or "").lower().strip()
+    name = (body.name or "").strip()
+    if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+    if not name:
+        raise HTTPException(status_code=400, detail="Enter your name")
+    if len(body.password or "") < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if email == ADMIN_EMAIL:
+        raise HTTPException(status_code=400, detail="This email cannot be registered")
+
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email is already registered. Sign in instead.")
+
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
     user = {
         "user_id": user_id,
-        "email": f"{user_id}@guest.local",
-        "name": "Guest",
+        "email": email,
+        "name": name,
         "picture": None,
-        "is_guest": True,
+        "is_guest": False,
         "is_admin": False,
         "is_premium": False,
+        "auth_provider": "password",
+        "password_hash": pwd_context.hash(body.password),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.users.insert_one(user)
+    await db.users.insert_one(dict(user))
+
+    token = uuid.uuid4().hex
     await db.user_sessions.insert_one(
         {
             "session_token": token,
@@ -378,7 +449,47 @@ async def create_guest():
             "expires_at": datetime.now(timezone.utc) + timedelta(days=30),
         }
     )
-    return {"session_token": token, "user": _user_public(user)}
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    user_doc = await _ensure_whitelist_sync(user_doc)
+    return {"session_token": token, "user": _user_public(user_doc)}
+
+
+@api.post("/auth/login")
+async def email_login(body: EmailLoginRequest):
+    email = (body.email or "").lower().strip()
+    password = body.password or ""
+
+    # Admin shortcut — admin signs in via the same form.
+    if email == ADMIN_EMAIL and hmac.compare_digest(password, ADMIN_PASSWORD):
+        return await admin_login(AdminLogin(email=email, password=password))
+
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user or not user.get("password_hash"):
+        # Same message for unknown email / Google-only accounts to avoid enumeration,
+        # except guide Google users explicitly.
+        if user and not user.get("password_hash"):
+            raise HTTPException(status_code=401, detail="This account uses Google Sign-In. Tap the Google button below.")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not pwd_context.verify(password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    user_id = user["user_id"]
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}},
+    )
+    token = uuid.uuid4().hex
+    await db.user_sessions.insert_one(
+        {
+            "session_token": token,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(days=30),
+        }
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    user_doc = await _ensure_whitelist_sync(user_doc)
+    return {"session_token": token, "user": _user_public(user_doc)}
 
 
 @api.post("/auth/admin")
