@@ -184,7 +184,7 @@ export default function Login() {
         <Text style={styles.title}>Welcome to{"\n"}KeyMind AI</Text>
         <Text style={styles.subtitle}>
           Sign in with your Google account to unlock multilingual grammar
-          correction, 13 AI writing tools and your personal writing tutor.
+          correction, 13 writing tools and your personal writing tutor.
         </Text>
 
         {error ? (
