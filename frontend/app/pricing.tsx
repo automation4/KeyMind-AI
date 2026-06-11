@@ -20,7 +20,7 @@ type Plan = {
 const FEATURES = [
   "Unlimited AI tool uses every day",
   "Ad-free experience across the app",
-  "All 14 writing tools + Vocab",
+  "All 13 writing tools + Vocab",
   "Translate to 15+ languages incl. Sanskrit",
   "Priority access to new features",
 ];

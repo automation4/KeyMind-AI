@@ -114,3 +114,11 @@ Known env note: Metro runs in CI mode (no hot reload) — restart expo after fro
 2. **Describe renamed** → "Describe & Translate" (tools.ts, id still `vocab`).
 3. **Translate tool removed** from TOOLS (Describe & Translate covers it). Count auto-shows 13; onboarding copy updated.
 4. **Chat reply-language picker removed** (blue-cross request): deleted ChatResponseLanguagePicker.tsx, useChatResponseLanguage.ts, chatResponseLanguages.ts; chat.tsx composer now only has the dictate-language chip; api.chat() no longer sends response_language. Backend still accepts the optional field (harmless, unused).
+
+## Changelog — 2026-02 (part 3: auth overhaul + guest device lock + premium patterns)
+1. **Email/password auth (real)**: `POST /api/auth/register` (name/email/password, bcrypt via passlib, min 8 chars) and `POST /api/auth/login`; issues same DB-backed session tokens as Google/guest flows. Admin signs in via the SAME form (admin email + password routes to admin login) — hidden 22-tap gesture removed.
+2. **Login screen redesigned** (`login.tsx` rewrite): email+password form card, SIGN IN / CREATE ACCOUNT toggle, "Or continue with" Google (functional, Emergent-managed) + Facebook/Apple (MOCKED coming-soon), CONTINUE AS GUEST, no Emergent branding text, subtitle says "13 AI writing tools".
+3. **Guest once per device**: frontend persists `keymind_device_id` (storage) and sends it to `/api/auth/guest`; backend reuses guest user by `guest_device_id` → usage limits can't be reset by re-guesting. No-body requests still create anonymous guests (back-compat).
+4. **Premium pattern themes**: ThemeContext extended with `pattern` (classic/dots/grid/stripes/waves, persisted). New `PatternBackground`/`PatternSvg` (react-native-svg, newly installed). Settings → "BACKGROUND PATTERN" section with PREMIUM tag; free users see locks → /pricing; applied pattern renders behind all 4 tab screens.
+5. Pricing copy fixed: "All 13 writing tools".
+Testing: iteration_10 — backend 13/13 pytest pass (`/app/backend/tests/test_iter10_auth_and_guest.py`), all frontend flows pass.
