@@ -98,6 +98,14 @@ export function ResultSuggestion({
         {result.tool === "idioms" ? (
           <ListenButton text={suggestion} small testID={`listen-idiom-${index}`} />
         ) : null}
+        {isReply ? (
+          <ListenButton
+            text={wordPart}
+            small
+            compact
+            testID={`listen-reply-${index}`}
+          />
+        ) : null}
       </View>
     </TouchableOpacity>
   );
