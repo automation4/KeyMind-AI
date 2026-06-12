@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Header, Request, File, Up
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
 import os
 import logging
 import uuid
@@ -437,14 +438,47 @@ async def google_login(body: GoogleAuthRequest):
 
 @api.post("/auth/guest")
 async def create_guest(body: Optional[GuestAuth] = None):
+    """Atomically get-or-create a guest account anchored to the caller's stable
+    device id. Uses find_one_and_update(upsert=True) so two concurrent calls
+    with the same device_id resolve to the SAME document — preventing duplicate
+    guest accounts that would silently reset the user's daily tool-usage count.
+
+    The today-vs-stored daily reset still works as before via _user_public /
+    _bump_tool_usage; this endpoint only ensures the document is unique and
+    persistent per device.
+    """
     device_id = (body.device_id or "").strip() if body else ""
-    user = None
+    user: Optional[Dict[str, Any]] = None
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     if device_id:
-        # One guest account per device — reuse so usage limits persist.
-        user = await db.users.find_one(
-            {"guest_device_id": device_id, "is_guest": True}, {"_id": 0}
+        new_user_id = f"guest_{uuid.uuid4().hex[:12]}"
+        # Atomic upsert: returns the existing guest if one already exists for
+        # this device, otherwise creates a fresh one in a single round-trip.
+        user = await db.users.find_one_and_update(
+            {"guest_device_id": device_id, "is_guest": True},
+            {
+                "$setOnInsert": {
+                    "user_id": new_user_id,
+                    "email": f"{new_user_id}@guest.local",
+                    "name": "Guest",
+                    "picture": None,
+                    "is_guest": True,
+                    "is_admin": False,
+                    "is_premium": False,
+                    "guest_device_id": device_id,
+                    "created_at": now_iso,
+                },
+                "$set": {"last_seen_at": now_iso},
+            },
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+            projection={"_id": 0},
         )
-    if not user:
+    else:
+        # No device id available (e.g. unsupported web client) — fall back to a
+        # one-shot ephemeral guest. These cannot survive a sign-out/reinstall
+        # and will be metered fresh each session.
         user_id = f"guest_{uuid.uuid4().hex[:12]}"
         user = {
             "user_id": user_id,
@@ -454,12 +488,12 @@ async def create_guest(body: Optional[GuestAuth] = None):
             "is_guest": True,
             "is_admin": False,
             "is_premium": False,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": now_iso,
+            "last_seen_at": now_iso,
         }
-        if device_id:
-            user["guest_device_id"] = device_id
         await db.users.insert_one(dict(user))
         user.pop("_id", None)
+
     token = uuid.uuid4().hex
     await db.user_sessions.insert_one(
         {
@@ -1196,7 +1230,80 @@ async def startup_indexes():
     await db.history.create_index([("user_id", 1), ("created_at", -1)])
     await db.chat_messages.create_index([("session_id", 1), ("created_at", 1)])
     await db.whitelist.create_index("email", unique=True)
+
+    # --- Guest persistence safety net ---
+    # 1) Collapse any pre-existing duplicate guest documents that share the same
+    #    device id (created by races in older builds). Preserve the highest
+    #    same-day usage count and re-point session tokens to the survivor.
+    # 2) Then create a UNIQUE partial index on guest_device_id so duplicates
+    #    can never be inserted again — this is what makes the daily usage
+    #    counter survive cache clears, sign-outs and reinstalls.
+    try:
+        await _dedupe_guest_users()
+    except Exception:
+        logger.exception("Guest dedup migration failed (continuing).")
+    try:
+        await db.users.create_index(
+            "guest_device_id",
+            unique=True,
+            partialFilterExpression={
+                "is_guest": True,
+                "guest_device_id": {"$type": "string"},
+            },
+            name="uniq_guest_device_id",
+        )
+    except Exception:
+        logger.exception("Failed to ensure unique guest_device_id index.")
+
     logger.info("Indexes ready")
+
+
+async def _dedupe_guest_users() -> None:
+    """Merge duplicate guest accounts that share the same `guest_device_id`.
+
+    Strategy per device_id with >1 guest documents:
+      • Keep the survivor with the highest `tool_usage_count` for TODAY
+        (so an in-progress day's count is never lost). Tie-break by most
+        recent `created_at`.
+      • Migrate any session tokens from duplicates → survivor.user_id.
+      • Delete duplicate user docs.
+    """
+    today = _today_str()
+    pipeline = [
+        {"$match": {"is_guest": True, "guest_device_id": {"$type": "string"}}},
+        {"$group": {"_id": "$guest_device_id", "count": {"$sum": 1},
+                    "ids": {"$push": "$user_id"}}},
+        {"$match": {"count": {"$gt": 1}}},
+    ]
+    cursor = db.users.aggregate(pipeline)
+    merged = 0
+    async for group in cursor:
+        ids: List[str] = list(group.get("ids") or [])
+        if len(ids) < 2:
+            continue
+        docs = await db.users.find(
+            {"user_id": {"$in": ids}}, {"_id": 0}
+        ).to_list(length=len(ids))
+
+        def _score(d: Dict[str, Any]):
+            same_day_count = (
+                int(d.get("tool_usage_count") or 0)
+                if d.get("tool_usage_date") == today else 0
+            )
+            return (same_day_count, str(d.get("created_at") or ""))
+
+        docs.sort(key=_score, reverse=True)
+        survivor = docs[0]
+        survivor_id = survivor["user_id"]
+        loser_ids = [d["user_id"] for d in docs[1:]]
+        # Re-point sessions then drop duplicate user docs.
+        await db.user_sessions.update_many(
+            {"user_id": {"$in": loser_ids}}, {"$set": {"user_id": survivor_id}}
+        )
+        await db.users.delete_many({"user_id": {"$in": loser_ids}})
+        merged += len(loser_ids)
+    if merged:
+        logger.info("Merged %d duplicate guest user(s) on startup.", merged)
 
 
 @app.on_event("shutdown")
