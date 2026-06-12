@@ -47,8 +47,8 @@ TOOL_PROMPTS: Dict[str, str] = {
         "Return ONLY the rewritten text."
     ),
     "smart_reply": (
-        "Generate exactly 4 short, distinct, contextual reply options to the conversation message below. "
-        "Format as a numbered list (1., 2., 3., 4.) and nothing else — each option on ONE single line. "
+        "Generate exactly 3 short, distinct, contextual reply options to the conversation message below. "
+        "Format as a numbered list (1., 2., 3.) and nothing else — each option on ONE single line. "
         "Match the original language and script of the message (slang stays slang).\n"
         "IF a reply is NOT in English (native script OR romanized like Hinglish/Tanglish), append on the SAME line: "
         "' | English: <one short plain-English translation of that reply>'. "
@@ -164,8 +164,11 @@ TOOL_PROMPTS: Dict[str, str] = {
         "You are a helpful AI writing assistant. Respond directly and concisely to the user's request below."
     ),
     "paraphrase": (
-        "Generate exactly 3 distinct paraphrased versions of the text below. Preserve language and meaning. "
-        "Format as a numbered list (1., 2., 3.) and nothing else."
+        "Generate exactly 3 distinct paraphrased versions of the text below. Preserve the original language, script and meaning. "
+        "Format as a numbered list (1., 2., 3.) and nothing else — each version on ONE single line.\n"
+        "IF a paraphrase is NOT in English (native script OR romanized like Hinglish/Tanglish), append on the SAME line: "
+        "' | English: <one short plain-English translation of that paraphrase>'. "
+        "If the paraphrase is already in English, append NOTHING after it."
     ),
     "emoji": (
         "Suggest 8 relevant emojis (only emoji characters, separated by single spaces) that match the mood and "

@@ -32,15 +32,19 @@ export function ResultSuggestion({
 }: Props) {
   const isWordList = result.tool === "synonyms" || result.tool === "antonyms";
   const isReply = result.tool === "smart_reply";
+  const isParaphrase = result.tool === "paraphrase";
+  const hasTranslation = isReply || isParaphrase; // both may carry "| English: ..."
   let wordPart = suggestion;
   let meaningPart = "";
-  if ((isWordList || isReply) && suggestion.includes("|")) {
+  if ((isWordList || hasTranslation) && suggestion.includes("|")) {
     const parts = suggestion.split("|");
     wordPart = (parts[0] || "").trim();
     meaningPart = parts.slice(1).join("|").trim();
+    // Strip leading "English:" label if backend prefixed it
+    meaningPart = meaningPart.replace(/^English\s*:\s*/i, "");
   }
-  const applyValue = isWordList || isReply ? wordPart : suggestion;
-  const copyValue = isWordList || isReply ? wordPart : suggestion;
+  const applyValue = isWordList || hasTranslation ? wordPart : suggestion;
+  const copyValue = isWordList || hasTranslation ? wordPart : suggestion;
 
   return (
     <TouchableOpacity
@@ -70,10 +74,10 @@ export function ResultSuggestion({
         </View>
       ) : (
         <Text style={styles.resultText} selectable>
-          {isReply ? wordPart : suggestion}
+          {hasTranslation ? wordPart : suggestion}
         </Text>
       )}
-      {(isWordList || isReply) && meaningPart ? (
+      {(isWordList || hasTranslation) && meaningPart ? (
         <Text style={styles.wordCardMeaning} selectable>
           {meaningPart}
         </Text>
@@ -104,6 +108,14 @@ export function ResultSuggestion({
             small
             compact
             testID={`listen-reply-${index}`}
+          />
+        ) : null}
+        {isParaphrase ? (
+          <ListenButton
+            text={wordPart}
+            small
+            compact
+            testID={`listen-paraphrase-${index}`}
           />
         ) : null}
       </View>

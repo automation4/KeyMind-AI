@@ -55,7 +55,7 @@ class TestSmartReply:
         assert r.status_code == 200, r.text
         body = r.json()
         suggestions = body.get("suggestions") or []
-        assert len(suggestions) == 4, f"expected 4 suggestions, got {len(suggestions)}: {suggestions}"
+        assert len(suggestions) == 3, f"expected 3 suggestions, got {len(suggestions)}: {suggestions}"
         for s in suggestions:
             assert isinstance(s, str) and s.strip(), f"empty suggestion: {s!r}"
             assert "| English:" not in s, f"English-only reply must NOT include translation suffix: {s!r}"
@@ -73,7 +73,7 @@ class TestSmartReply:
         assert r.status_code == 200, r.text
         body = r.json()
         suggestions = body.get("suggestions") or []
-        assert len(suggestions) == 4, f"expected 4 suggestions, got {len(suggestions)}: {suggestions}"
+        assert len(suggestions) == 3, f"expected 3 suggestions, got {len(suggestions)}: {suggestions}"
         for s in suggestions:
             assert "| English:" in s, f"Hindi reply must include ' | English: ' translation: {s!r}"
             reply_part, english_part = s.split("| English:", 1)
