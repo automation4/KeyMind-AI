@@ -1040,37 +1040,38 @@ async def ocr(req: OCRRequest):
 
 
 # =====================================================
-# TTS — Native-voice audio via OpenAI tts-1
+# TTS — Native-voice audio via OpenAI tts-1-hd
 # =====================================================
+# Voice notes: 'coral', 'sage' and 'ash' are OpenAI's newest, most natural-
+# sounding voices. 'coral' handles Indic languages (Hindi, Kannada, Tamil,
+# Telugu, Bengali, etc.) with a noticeably more native accent than the older
+# voices, while 'sage' is well-suited to Arabic and CJK. English / Latin-script
+# text defaults to 'nova'.
+_INDIC_RANGES = (
+    (0x0900, 0x097F),  # Devanagari (Hindi/Marathi/Sanskrit)
+    (0x0980, 0x09FF),  # Bengali
+    (0x0A00, 0x0A7F),  # Gurmukhi (Punjabi)
+    (0x0A80, 0x0AFF),  # Gujarati
+    (0x0B00, 0x0B7F),  # Odia
+    (0x0B80, 0x0BFF),  # Tamil
+    (0x0C00, 0x0C7F),  # Telugu
+    (0x0C80, 0x0CFF),  # Kannada
+    (0x0D00, 0x0D7F),  # Malayalam
+)
+
+
 def _detect_voice(text: str) -> str:
     if not text:
         return "nova"
     for ch in text:
         code = ord(ch)
-        if 0x0900 <= code <= 0x097F:
-            return "shimmer"
-        if 0x0980 <= code <= 0x09FF:
-            return "shimmer"
-        if 0x0B80 <= code <= 0x0BFF:
-            return "nova"
-        if 0x0C00 <= code <= 0x0C7F:
-            return "nova"
-        if 0x0C80 <= code <= 0x0CFF:
-            return "nova"
-        if 0x0D00 <= code <= 0x0D7F:
-            return "nova"
-        if 0x0A80 <= code <= 0x0AFF:
-            return "shimmer"
-        if 0x0A00 <= code <= 0x0A7F:
-            return "shimmer"
-        if 0x0B00 <= code <= 0x0B7F:
-            return "nova"
-        if 0x0600 <= code <= 0x06FF:
-            return "fable"
-        if 0x4E00 <= code <= 0x9FFF:
-            return "alloy"
-        if 0x3040 <= code <= 0x30FF:
-            return "alloy"
+        for lo, hi in _INDIC_RANGES:
+            if lo <= code <= hi:
+                return "coral"
+        if 0x0600 <= code <= 0x06FF:  # Arabic / Urdu
+            return "sage"
+        if 0x4E00 <= code <= 0x9FFF or 0x3040 <= code <= 0x30FF:  # CJK / Kana
+            return "sage"
     return "nova"
 
 
@@ -1087,7 +1088,7 @@ async def tts(req: TTSRequest):
         tts_client = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
         audio_bytes = await tts_client.generate_speech(
             text=req.text[:4000],
-            model="tts-1",
+            model="tts-1-hd",
             voice=voice,
             speed=1.0,
             response_format="mp3",

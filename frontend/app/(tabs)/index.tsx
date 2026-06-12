@@ -241,7 +241,7 @@ export default function WriteScreen() {
         {/* Tools selector (dropdown) */}
         <View style={styles.sectionRow}>
           <Text style={[styles.section, { marginTop: 0, marginBottom: 0 }]}>
-            AI WRITING TOOLS
+            TOOLS
           </Text>
           {activeTool ? (
             <TouchableOpacity

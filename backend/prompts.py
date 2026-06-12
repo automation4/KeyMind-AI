@@ -47,8 +47,12 @@ TOOL_PROMPTS: Dict[str, str] = {
         "Return ONLY the rewritten text."
     ),
     "smart_reply": (
-        "Generate exactly 3 short, distinct, contextual reply options to the conversation message below. "
-        "Format as a numbered list (1., 2., 3.) and nothing else. Match the original language."
+        "Generate exactly 4 short, distinct, contextual reply options to the conversation message below. "
+        "Format as a numbered list (1., 2., 3., 4.) and nothing else — each option on ONE single line. "
+        "Match the original language and script of the message (slang stays slang).\n"
+        "IF a reply is NOT in English (native script OR romanized like Hinglish/Tanglish), append on the SAME line: "
+        "' | English: <one short plain-English translation of that reply>'. "
+        "If the reply is already in English, append NOTHING after it."
     ),
     "vocab": (
         "You are a concise multilingual explainer. The user gives you EITHER a single word, a short phrase, "

@@ -38,7 +38,6 @@ export default function Index() {
         <Text style={styles.logoText}>KM</Text>
       </View>
       <Text style={styles.title}>KeyMind AI</Text>
-      <Text style={styles.subtitle}>your writing co-pilot</Text>
       <ActivityIndicator style={{ marginTop: 32 }} color={COLORS.text} />
     </View>
   );
@@ -74,14 +73,6 @@ const styles = StyleSheet.create({
     fontSize: 44,
     fontWeight: FONT.black,
     letterSpacing: -1.5,
-    color: COLORS.text,
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: FONT.bold,
-    letterSpacing: 2,
-    textTransform: "uppercase",
     color: COLORS.text,
   },
 });

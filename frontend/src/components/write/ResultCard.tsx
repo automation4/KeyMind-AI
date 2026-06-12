@@ -31,15 +31,16 @@ export function ResultSuggestion({
   onCopy,
 }: Props) {
   const isWordList = result.tool === "synonyms" || result.tool === "antonyms";
+  const isReply = result.tool === "smart_reply";
   let wordPart = suggestion;
   let meaningPart = "";
-  if (isWordList && suggestion.includes("|")) {
+  if ((isWordList || isReply) && suggestion.includes("|")) {
     const parts = suggestion.split("|");
     wordPart = (parts[0] || "").trim();
     meaningPart = parts.slice(1).join("|").trim();
   }
-  const applyValue = isWordList ? wordPart : suggestion;
-  const copyValue = isWordList ? wordPart : suggestion;
+  const applyValue = isWordList || isReply ? wordPart : suggestion;
+  const copyValue = isWordList || isReply ? wordPart : suggestion;
 
   return (
     <TouchableOpacity
@@ -69,10 +70,10 @@ export function ResultSuggestion({
         </View>
       ) : (
         <Text style={styles.resultText} selectable>
-          {suggestion}
+          {isReply ? wordPart : suggestion}
         </Text>
       )}
-      {isWordList && meaningPart ? (
+      {(isWordList || isReply) && meaningPart ? (
         <Text style={styles.wordCardMeaning} selectable>
           {meaningPart}
         </Text>
