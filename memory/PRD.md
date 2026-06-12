@@ -155,3 +155,18 @@ Testing: iteration_10 — backend 13/13 pytest pass (`/app/backend/tests/test_it
 2. **Theme modes**: default = light; added third mode "matte" (#2E2E33 bg / #3B3B41 surface) alongside light/dark. ThemeContext mode type + storage + settings UI (3 cards: Light/Matte/Dark).
 3. **Dark/matte footer icons**: tab icons now have inside-out borders — outer light halo ring + inner black border + subtle bg, inactive tint #E8E8E8. Clearly visible on dark bgs.
 4. **Custom accent color picker (PREMIUM)**: new AccentColorPicker modal (36-swatch HSL palette) opened from a special swatch in Settings ACCENT row; free users see lock → /pricing. ThemeContext customAccent (storage keymind_custom_accent) overrides accentColor; picking a named accent clears it.
+
+## Changelog — 2026-02 (part 9: iter11 — 6 user fixes, fork session)
+1. Splash: removed "your writing co-pilot" tagline (app/index.tsx).
+2. App name: code already "KeyMind AI"; the disabled name field in the Emergent build dialog comes from the EMERGENT PROJECT TITLE — user must rename the project in the Emergent dashboard (Project Settings) and rebuild. Communicated to user.
+3. Chat: REMOVED floating scroll-to-top/bottom buttons + per-scroll setScrollPos state (truncating UI + root cause of Android crash when tapping chat input). Auto-scroll-on-new-message kept via autoScrollOnce ref. Testing agent cleaned a leftover callback ref.
+4. Home: section header "AI WRITING TOOLS" → "TOOLS".
+5. TTS: /api/tts upgraded tts-1 → tts-1-hd; voice map: Indic scripts → "coral", Arabic/CJK → "sage", default → "nova" (more natural native accents). NOTE: emergentintegrations does NOT support gpt-4o-mini-tts/instructions.
+6. Smart Reply → "Reply": 4 options (was 3); non-English replies append " | English: <translation>" (prompts.py); ResultCard splits pipe and renders English line below reply in muted style; APPLY/COPY use only the reply text.
+- Testing: iter11 — backend 7/7 pytest pass (tests/test_iter11_reply_and_tts.py), frontend E2E pass (test_reports/iteration_11.json).
+
+## Remaining backlog
+- P0: Guest usage reset on reinstall/sign-out (diagnostic deviceId card in Settings for admin; debug server.py /auth/guest device_id lookup).
+- P1: Android Google Login (needs user's Android OAuth Client ID + SHA-1).
+- P2: Native Android keyboard IME extension (needs native build); real payments (Stripe/Razorpay); Emergent deployment failure (supervisor_config_valid: false).
+- Pending user confirmation: generate .env.example + docker-compose.yml for self-hosting.
