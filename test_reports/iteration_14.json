@@ -1,0 +1,32 @@
+{
+  "summary": "Backend-only iter14 validation for new POST /api/auth/setup-complete endpoint + setup_completed user flag. All 6 new iter14 tests PASS: admin POST flips flag → response & /auth/me both show setup_completed=true; fresh guest defaults to setup_completed=false; flag persists across logout+re-login; unauthenticated requests return 401; old token after logout is rejected. Regression suite (iter11 + iter12 + iter13 = 20 tests) all PASS — smart_reply EN/HI counts, paraphrase EN/HI translation suffix, TTS nova/coral voices, guest device persistence + race protection unchanged.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_setup_complete.py",
+    "/app/test_reports/pytest/iter14_setup_complete.xml",
+    "/app/test_reports/pytest/iter14_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/api/auth/setup-complete endpoint is correctly auth-gated via get_current_user (401 on missing/bad token) and idempotent (re-calling does not break).",
+    "_user_public() at /app/backend/server.py:260 always emits setup_completed (defaults to false via bool() coercion), so existing users without the field show false until they POST setup-complete — correct behaviour."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter14_setup_complete.py (NEW)"
+  ],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "not tested (out of scope)"},
+  "seed_data_creation": "Created a transient guest user with device_id TEST_DEVICE_ITER14_FRESH_<rand> and cleaned it up in the module-scoped mongo fixture teardown. Admin user setup_completed flag is left as true after the run (account-bound flag is intentional and idempotent).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Frontend changes for iter14 (Versify chip label, KeyboardAvoidingView, APK softwareKeyboardLayoutMode='resize', guest-hidden premium CTAs on pricing.tsx/settings.tsx, premium badge on home header, locale-aware Write placeholder, setup gating on user.setup_completed) are visual-only and were NOT tested here. If a frontend pass is requested, focus on: (a) /pricing & /settings hide upgrade CTAs for is_guest=true users, (b) home header shows premium badge only when is_premium=true, (c) setup.tsx calls api.setupComplete on finish for non-guest users, (d) login.tsx isSetupAlreadyDone helper routes returning admin past the setup screen, (e) Write screen placeholder switches by locale. Admin user himthegreat@gmail.com now has setup_completed=true in DB.",
+  "rca_of_issue": "N/A — no defects found. All 6 new endpoint cases and 20 regression cases pass cleanly."
+}

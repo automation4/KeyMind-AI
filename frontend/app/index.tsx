@@ -23,7 +23,9 @@ export default function Index() {
         router.replace("/login");
         return;
       }
-      const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
+      const setupDone =
+        (await storage.getItem<boolean>("keymind_setup_done", false)) ||
+        !!(user as any).setup_completed; // honour server-side flag for returning users
       if (!setupDone) {
         router.replace("/setup");
         return;

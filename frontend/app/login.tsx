@@ -18,6 +18,7 @@ import * as Google from "expo-auth-session/providers/google";
 import Svg, { Path } from "react-native-svg";
 
 import { useAuth } from "@/src/contexts/AuthContext";
+import { api } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 
@@ -38,6 +39,21 @@ const GoogleLogo: React.FC<{ size?: number }> = ({ size = 22 }) => (
 
 export default function Login() {
   const { signInAsGuest, signInWithGoogleIdToken, signInAsAdmin } = useAuth();
+
+  /** Returns true if the user has already completed "Make it yours" — either
+   * locally (this device) or on the server (returning user on a fresh device). */
+  const isSetupAlreadyDone = async (): Promise<boolean> => {
+    if (await storage.getItem<boolean>("keymind_setup_done", false)) return true;
+    try {
+      const res = await api.me();
+      if ((res?.user as any)?.setup_completed) {
+        // Cache locally so we don't ping the server again this session
+        await storage.setItem("keymind_setup_done", true);
+        return true;
+      }
+    } catch {}
+    return false;
+  };
   const router = useRouter();
   const [busy, setBusy] = useState<"google" | "guest" | "admin" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +77,7 @@ export default function Login() {
       setBusy("google");
       try {
         await signInWithGoogleIdToken(idToken);
-        const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
+        const setupDone = await isSetupAlreadyDone();
         router.replace(setupDone ? "/(tabs)" : "/setup");
       } catch (e: any) {
         setError(e?.detail || e?.message || "Google sign-in failed.");
@@ -144,7 +160,7 @@ export default function Login() {
     try {
       await signInAsAdmin(adminEmail.trim(), adminPassword);
       setAdminModalOpen(false);
-      const setupDone = await storage.getItem<boolean>("keymind_setup_done", false);
+      const setupDone = await isSetupAlreadyDone();
       router.replace(setupDone ? "/(tabs)" : "/setup");
     } catch (e: any) {
       setAdminError(e?.detail || e?.message || "Invalid credentials");

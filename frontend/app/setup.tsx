@@ -7,6 +7,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { storage } from "@/src/utils/storage";
 import { useTheme, AccentName } from "@/src/contexts/ThemeContext";
+import { api } from "@/src/lib/api";
+import { useAuth } from "@/src/contexts/AuthContext";
 
 const LANGUAGES = [
   "English", "Hindi", "Sanskrit", "Hinglish", "Bengali", "Tamil", "Telugu", "Marathi",
@@ -25,6 +27,7 @@ const ACCENTS: { id: AccentName; color: string; label: string }[] = [
 export default function Setup() {
   const router = useRouter();
   const { mode, accent, setMode, setAccent } = useTheme();
+  const { user, refreshUser } = useAuth();
   const [selectedLangs, setSelectedLangs] = useState<string[]>(["English", "Hindi"]);
 
   const toggleLang = (l: string) => {
@@ -36,6 +39,14 @@ export default function Setup() {
   const finish = async () => {
     await storage.setItem("keymind_languages", JSON.stringify(selectedLangs));
     await storage.setItem("keymind_setup_done", true);
+    // Persist on the user record (server-side) so returning users skip setup
+    // on a fresh install / cache wipe — except true guests which are device-bound.
+    if (user && !user.is_guest) {
+      try {
+        await api.setupComplete();
+        await refreshUser();
+      } catch {}
+    }
     router.replace("/(tabs)");
   };
 

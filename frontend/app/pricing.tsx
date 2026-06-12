@@ -50,10 +50,18 @@ export default function Pricing() {
 
   const isAdminGranted = user?.is_premium && user?.premium_source === "admin";
   const isSubscribed = user?.is_premium && user?.premium_source === "subscription";
+  const isGuest = !!user?.is_guest;
 
   const onSubscribe = async () => {
-    if (!user) {
-      Alert.alert("Sign in needed", "Please sign in before subscribing.");
+    if (!user || isGuest) {
+      Alert.alert(
+        "Sign in to subscribe",
+        "Premium upgrades are tied to your account. Please sign in with Google or email to continue.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Sign in", onPress: () => router.replace("/login") },
+        ],
+      );
       return;
     }
     setSubscribing(true);
@@ -159,7 +167,26 @@ export default function Pricing() {
           ))}
         </View>
 
-        {!isAdminGranted && (
+        {!isAdminGranted && isGuest && (
+          <View style={[styles.banner, { backgroundColor: COLORS.peach }]} testID="guest-signin-banner">
+            <Ionicons name="log-in-outline" size={20} color={COLORS.text} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bannerTitle}>Sign in to upgrade</Text>
+              <Text style={styles.bannerSub}>
+                Premium upgrades are tied to your account. Sign in with Google or email to choose a plan.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.signInBtn}
+              onPress={() => router.replace("/login")}
+              testID="guest-signin-btn"
+            >
+              <Text style={styles.signInBtnText}>SIGN IN</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!isAdminGranted && !isGuest && (
           <>
             <Text style={styles.sectionLabel}>CHOOSE A PLAN</Text>
             <View style={{ gap: 12 }}>
@@ -259,6 +286,13 @@ const styles = StyleSheet.create({
   },
   bannerTitle: { fontSize: 14, fontWeight: FONT.black, color: COLORS.text },
   bannerSub: { marginTop: 2, fontSize: 12, color: COLORS.text, opacity: 0.85 },
+
+  signInBtn: {
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: RADIUS.pill, backgroundColor: COLORS.text,
+    borderWidth: 2, borderColor: COLORS.border, ...SHADOW.brutalSm,
+  },
+  signInBtnText: { color: COLORS.bg, fontSize: 12, fontWeight: FONT.black, letterSpacing: 1.2 },
 
   featureCard: {
     marginTop: 24, padding: 18, borderRadius: RADIUS.lg,

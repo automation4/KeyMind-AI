@@ -257,6 +257,7 @@ def _user_public(user: Dict[str, Any]) -> Dict[str, Any]:
         "tool_uses_today": usage_count,
         "tool_uses_limit": limit,
         "tool_uses_remaining": max(0, limit - usage_count) if not is_premium else None,
+        "setup_completed": bool(user.get("setup_completed")),
     }
 
 
@@ -660,6 +661,20 @@ async def logout(authorization: Optional[str] = Header(None)):
         token = authorization.split(" ", 1)[1].strip()
         await db.user_sessions.delete_one({"session_token": token})
     return {"ok": True}
+
+
+@api.post("/auth/setup-complete")
+async def mark_setup_complete(authorization: Optional[str] = Header(None)):
+    """Mark the current user as having finished the 'Make it yours' setup.
+    This is what makes returning users skip the setup screen on a fresh
+    install / cache wipe — the flag travels with the account, not the device.
+    """
+    user = await get_current_user(authorization)
+    await db.users.update_one(
+        {"user_id": user["user_id"]}, {"$set": {"setup_completed": True}}
+    )
+    user["setup_completed"] = True
+    return {"ok": True, "user": _user_public(user)}
 
 
 # =====================================================

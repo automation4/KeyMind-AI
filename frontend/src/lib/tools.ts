@@ -44,7 +44,7 @@ export const TOOLS: ToolDef[] = [
     icon: "musical-notes",
     description: "Turn text into poem or shayari",
     accent: "lilac",
-    options: [{ key: "style", label: "Style", choices: ["Poem", "Shayari", "Kavithai", "Ghazal", "Rhyming verse"] }],
+    options: [{ key: "style", label: "Style", choices: ["Poem", "Shayari", "Kavithai", "Ghazal", "Rhyme"] }],
   },
 ];
 

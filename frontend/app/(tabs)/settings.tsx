@@ -232,8 +232,8 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        {/* Premium CTA for non-premium users */}
-        {!isPremium && (
+        {/* Premium CTA for non-premium users — hidden for guests (must sign in first) */}
+        {!isPremium && !user?.is_guest && (
           <TouchableOpacity
             style={[styles.proCard, { backgroundColor: COLORS.primary }]}
             onPress={() => router.push("/pricing")}
@@ -245,6 +245,22 @@ export default function SettingsScreen() {
               <Text style={styles.proSub}>From ₹250/week · Cancel anytime</Text>
             </View>
             <Ionicons name="arrow-forward-circle" size={36} color={COLORS.onPrimary} />
+          </TouchableOpacity>
+        )}
+
+        {/* Sign-in CTA for guests in place of Go Premium */}
+        {!isPremium && user?.is_guest && (
+          <TouchableOpacity
+            style={[styles.proCard, { backgroundColor: COLORS.peach }]}
+            onPress={() => router.replace("/login")}
+            testID="settings-signin-btn"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.proEyebrow}>SIGN IN TO UPGRADE</Text>
+              <Text style={styles.proTitle}>Sign in</Text>
+              <Text style={styles.proSub}>Premium upgrades are tied to your account.</Text>
+            </View>
+            <Ionicons name="log-in-outline" size={32} color={COLORS.text} />
           </TouchableOpacity>
         )}
 

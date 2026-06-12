@@ -193,10 +193,18 @@ export default function WriteScreen() {
       <PatternBackground />
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.eyebrow}>
-            HELLO, {(user?.name || "WRITER").toUpperCase()}
-          </Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <Text style={styles.eyebrow}>
+              HELLO, {(user?.name || "WRITER").toUpperCase()}
+            </Text>
+            {isPremium ? (
+              <View style={styles.premiumPill} testID="home-premium-badge">
+                <Ionicons name="diamond" size={10} color={COLORS.text} />
+                <Text style={styles.premiumPillText}>PREMIUM</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.title}>What are{"\n"}we writing?</Text>
         </View>
         <View style={[styles.avatar, { backgroundColor: accentColor }]}>
@@ -479,6 +487,23 @@ const styles = StyleSheet.create({
     ...SHADOW.brutalSm,
   },
   avatarText: { fontSize: 18, fontWeight: FONT.black, color: COLORS.onPrimary },
+  premiumPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.mint,
+  },
+  premiumPillText: {
+    fontSize: 9,
+    fontWeight: FONT.black,
+    letterSpacing: 1.2,
+    color: COLORS.text,
+  },
   section: {
     fontSize: 11,
     fontWeight: FONT.black,

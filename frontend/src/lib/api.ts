@@ -75,6 +75,11 @@ export const api = {
     }),
   me: () => request<{ user: any }>("/auth/me", { auth: true }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST", auth: true }),
+  setupComplete: () =>
+    request<{ ok: boolean; user: any }>("/auth/setup-complete", {
+      method: "POST",
+      auth: true,
+    }),
 
   tool: (tool: string, text: string, options: Record<string, any> = {}) =>
     request<{ tool: string; original: string; suggestions: string[]; explanation?: string; data?: Record<string, any> | null }>(

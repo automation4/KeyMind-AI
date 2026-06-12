@@ -17,6 +17,7 @@ import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { MicButton } from "@/src/components/MicButton";
 import { DictateLanguagePicker } from "@/src/components/DictateLanguagePicker";
 import { api } from "@/src/lib/api";
+import { getWritePlaceholder } from "@/src/lib/localePlaceholder";
 
 type Props = {
   text: string;
@@ -154,7 +155,7 @@ export function WriteInputCard({
         }}
         multiline
         editable={!listening}
-        placeholder="Paste, type, or hold the mic to dictate…"
+        placeholder={getWritePlaceholder()}
         placeholderTextColor={COLORS.textMuted}
         style={[
           styles.input,

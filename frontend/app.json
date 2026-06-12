@@ -2,7 +2,7 @@
   "expo": {
     "name": "KeyMind AI",
     "slug": "keymind-ai",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
@@ -10,13 +10,17 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "2",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Dictate text using your voice.",
-        "NSSpeechRecognitionUsageDescription": "Convert your speech to text as you talk."
+        "NSSpeechRecognitionUsageDescription": "Convert your speech to text as you talk.",
+        "CFBundleDisplayName": "KeyMind AI"
       }
     },
     "android": {
       "package": "com.keymind.app",
+      "versionCode": 2,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
@@ -44,7 +48,8 @@
       ],
       "expo-font",
       "expo-audio",
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
