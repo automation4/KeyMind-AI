@@ -12,11 +12,13 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
+import { useTheme } from "@/src/contexts/ThemeContext";
 import { api } from "@/src/lib/api";
 import { PatternBackground } from "@/src/components/PatternBackground";
 import { ListenButton } from "@/src/components/ListenButton";
@@ -78,6 +80,8 @@ const QUICK_PROMPTS = [
 ];
 
 export default function ChatScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
+  const { accentColor } = useTheme();
   const [sessionId, setSessionId] = useState<string>("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -190,7 +194,11 @@ export default function ChatScreen() {
           <Text style={styles.eyebrow}>ASK AI</Text>
           <Text style={styles.title}>Ask me anything.</Text>
         </View>
-        <TouchableOpacity style={styles.resetBtn} onPress={reset} testID="chat-reset-btn">
+        <TouchableOpacity
+          style={[styles.resetBtn, { backgroundColor: accentColor }]}
+          onPress={reset}
+          testID="chat-reset-btn"
+        >
           <Ionicons name="refresh" size={18} color={COLORS.text} />
         </TouchableOpacity>
       </View>
@@ -339,7 +347,7 @@ export default function ChatScreen() {
           )}
         </ScrollView>
 
-        <View style={styles.composer}>
+        <View style={[styles.composer, { paddingBottom: 12 + tabBarHeight }]}>
           <View style={styles.composerLangRow}>
             <DictateLanguagePicker compact />
           </View>
@@ -379,12 +387,16 @@ export default function ChatScreen() {
               onListeningChange={setChatListening}
             />
             <TouchableOpacity
-              style={[styles.sendBtn, (!input.trim() || busy) && { opacity: 0.5 }]}
+              style={[
+                styles.sendBtn,
+                { backgroundColor: accentColor },
+                (!input.trim() || busy) && { opacity: 0.5 },
+              ]}
               onPress={() => send()}
               disabled={!input.trim() || busy}
               testID="chat-send-btn"
             >
-              <Ionicons name="arrow-up" size={20} color={COLORS.bg} />
+              <Ionicons name="arrow-up" size={20} color={COLORS.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -399,7 +411,7 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.textMuted },
   title: { fontSize: 32, fontWeight: FONT.black, color: COLORS.text, letterSpacing: -1.2 },
   resetBtn: {
-    width: 40, height: 40, borderRadius: 12,
+    width: 40, height: 40, borderRadius: 999,
     backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border,
     alignItems: "center", justifyContent: "center", ...SHADOW.brutalSm,
   },

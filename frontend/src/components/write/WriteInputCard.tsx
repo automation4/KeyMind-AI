@@ -200,11 +200,11 @@ export function WriteInputCard({
           <TouchableOpacity
             onPress={() => onChangeText("")}
             disabled={!text}
-            style={styles.iconBtn}
+            style={[styles.iconBtn, text ? { backgroundColor: "#ff3b30" } : null]}
             testID="clear-input-btn"
             accessibilityLabel="Clear text"
           >
-            <Ionicons name="close" size={22} color={COLORS.text} />
+            <Ionicons name="close" size={22} color={text ? "#fff" : COLORS.text} />
           </TouchableOpacity>
         </View>
       </View>

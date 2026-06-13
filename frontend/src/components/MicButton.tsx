@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { COLORS, FONT, SHADOW } from "@/src/lib/theme";
+import { useTheme } from "@/src/contexts/ThemeContext";
 import { useDictateLanguage } from "@/src/hooks/useDictateLanguage";
 import { useStreamingSpeechRecognition } from "@/src/hooks/useStreamingSpeechRecognition";
 
@@ -48,6 +49,7 @@ export function MicButton({
   style,
 }: Props) {
   const { lang } = useDictateLanguage();
+  const { accentColor } = useTheme();
   const pulse = useRef(new Animated.Value(1)).current;
 
   const { listening, interim, error, start, stop } =
@@ -134,7 +136,7 @@ export function MicButton({
               width: size,
               height: size,
               borderRadius: size / 2,
-              backgroundColor: listening ? "#ff3b30" : COLORS.surface,
+              backgroundColor: listening ? "#ff3b30" : accentColor,
             },
           ]}
           testID="mic-button"

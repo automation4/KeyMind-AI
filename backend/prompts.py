@@ -114,6 +114,7 @@ TOOL_PROMPTS: Dict[str, str] = {
         "    \"present\": {\"english\": \"<PRESENT tense example>\", \"translated\": \"<same in {target_language} native script>\", \"transliterated\": \"<same in Latin alphabet; empty if Latin>\"},\n"
         "    \"future\":  {\"english\": \"<FUTURE tense example>\",  \"translated\": \"<same in {target_language} native script>\", \"transliterated\": \"<same in Latin alphabet; empty if Latin>\"}\n"
         "  },\n"
+        "  // CRITICAL: If the input is NOT a recognizable real word in ANY language (gibberish, random letters, typos with no clear correction), set \"part_of_speech\":\"other\", \"meaning_simple\":\"Not a recognized word.\", \"tenses\": null, \"native_alternative\":\"\", \"native_alternative_why\":\"\", \"memory_tip\":\"\", and \"idioms_phrases\": [].\n"
         "  \"idioms_phrases\": [\n"
         "    {\"english\": \"<a SHORT real-world ENGLISH sentence (≤15 words) that uses the word, or a popular ENGLISH idiom/phrase containing it. Pick ones that show flavour: workplace, casual chat, news headline, etc.>\",\n"
         "     \"translated\": \"<same sentence in {target_language} native script>\",\n"

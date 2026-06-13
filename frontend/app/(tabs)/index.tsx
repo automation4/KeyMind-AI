@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -105,6 +106,9 @@ export default function WriteScreen() {
   };
 
   const runTool = async (toolId: string, options: Record<string, any> = {}) => {
+    // Dismiss the on-screen keyboard the moment a tool is confirmed — the user
+    // is about to read AI output, not type more text.
+    Keyboard.dismiss();
     if (!text.trim()) {
       setError("Type something first ✍️");
       return;

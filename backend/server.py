@@ -234,26 +234,31 @@ def _user_public(user: Dict[str, Any]) -> Dict[str, Any]:
     today = _today_str()
     usage_date = user.get("tool_usage_date")
     usage_count = int(user.get("tool_usage_count") or 0) if usage_date == today else 0
-    is_premium = bool(user.get("is_premium") or user.get("is_admin"))
+    is_guest = bool(user.get("is_guest"))
+    # Hard rule: guests are NEVER premium or admin, regardless of any stored
+    # field on the document. Premium upgrades are tied to a real account.
+    is_admin = False if is_guest else bool(user.get("is_admin"))
+    is_premium = False if is_guest else bool(user.get("is_premium") or user.get("is_admin"))
     limit = FREE_TOOL_DAILY_LIMIT
     # Premium source for UI labelling: "admin" | "subscription" | None
     source: Optional[str] = None
-    if user.get("is_admin") or user.get("_admin_granted"):
-        source = "admin"
-    elif user.get("_subscription_active"):
-        source = "subscription"
+    if not is_guest:
+        if user.get("is_admin") or user.get("_admin_granted"):
+            source = "admin"
+        elif user.get("_subscription_active"):
+            source = "subscription"
     exp = _parse_dt(user.get("subscription_expires_at"))
     return {
         "user_id": user.get("user_id"),
         "email": user.get("email"),
         "name": user.get("name"),
         "picture": user.get("picture"),
-        "is_guest": bool(user.get("is_guest")),
-        "is_admin": bool(user.get("is_admin")),
+        "is_guest": is_guest,
+        "is_admin": is_admin,
         "is_premium": is_premium,
         "premium_source": source,
-        "subscription_plan": user.get("subscription_plan"),
-        "subscription_expires_at": exp.isoformat() if exp else None,
+        "subscription_plan": None if is_guest else user.get("subscription_plan"),
+        "subscription_expires_at": exp.isoformat() if (exp and not is_guest) else None,
         "tool_uses_today": usage_count,
         "tool_uses_limit": limit,
         "tool_uses_remaining": max(0, limit - usage_count) if not is_premium else None,

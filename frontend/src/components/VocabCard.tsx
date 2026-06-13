@@ -218,73 +218,12 @@ export function VocabCard({
         </View>
       ) : null}
 
-      {/* Spoken usage */}
-      {data.spoken_usage ? (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>WHEN SPEAKING</Text>
-            <ListenButton text={data.spoken_usage} small testID="listen-spoken" />
-          </View>
-          <Text style={styles.spokenEn} selectable>
-            “{data.spoken_usage}”
-          </Text>
-          {data.spoken_usage_translated && !loading ? (
-            <View style={styles.translatedLine}>
-              <Text style={styles.spokenNative} selectable>
-                {data.spoken_usage_translated}
-              </Text>
-              <ListenButton
-                text={data.spoken_usage_translated}
-                small
-                compact
-                testID="listen-spoken-translated"
-              />
-            </View>
-          ) : null}
-          {data.spoken_usage_transliterated && needsRoman(language) && !loading ? (
-            <View style={styles.translitWrap}>
-              <Text style={styles.translitLabel}>{romanLabel(language)}</Text>
-              <Text style={styles.translitText} selectable>
-                {data.spoken_usage_transliterated}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+      {/* Spoken usage — section removed per UX request; keep data plumbing
+          intact in case future versions want to surface it elsewhere. */}
 
-      {/* Native-speaker alternative */}
-      {data.native_alternative ? (
-        <View style={[styles.section, styles.altCard]}>
-          <Text style={styles.sectionLabel}>NATIVE SPEAKER WOULD SAY</Text>
-          <View style={styles.altWordRow}>
-            <Text style={styles.altWord} selectable>
-              {data.native_alternative}
-            </Text>
-            <ListenButton text={data.native_alternative} small testID="listen-native" />
-          </View>
-          {data.native_alternative_why ? (
-            <Text style={styles.altWhy} selectable>
-              Why: {data.native_alternative_why}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {/* Memory tip */}
-      {data.memory_tip ? (
-        <View style={[styles.section, styles.memCard]}>
-          <View style={styles.sectionHeader}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Ionicons name="bulb" size={14} color={COLORS.text} />
-              <Text style={styles.sectionLabel}>HOW TO REMEMBER</Text>
-            </View>
-            <ListenButton text={data.memory_tip} small testID="listen-mem" />
-          </View>
-          <Text style={styles.memText} selectable>
-            {data.memory_tip}
-          </Text>
-        </View>
-      ) : null}
+      {/* Native-speaker alternative + Memory tip have been moved AFTER the
+          tenses block (see "TIPS" group below) to keep the reading flow:
+          meaning → translation → usage → tips. */}
 
       {/* Language switcher + translated meaning */}
       <View style={styles.section}>
@@ -365,19 +304,16 @@ export function VocabCard({
         )}
       </View>
 
-      {/* Tense table */}
-      {data.tenses ? (
+      {/* Usage examples — only when input is a real word (tenses present) */}
+      {data.tenses && (data.part_of_speech || "").toLowerCase() !== "other" ? (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>USAGE IN TENSES</Text>
+          <Text style={styles.sectionLabel}>USAGE</Text>
           {(["past", "present", "future"] as const).map((t) => {
             const row = data.tenses?.[t];
             if (!row) return null;
             return (
-              <View key={t} style={styles.tenseRow} testID={`vocab-tense-${t}`}>
-                <View style={styles.tenseBadge}>
-                  <Text style={styles.tenseBadgeText}>{t.toUpperCase()}</Text>
-                </View>
-                <View style={{ gap: 6 }}>
+              <View key={t} style={styles.tenseRowNoBadge} testID={`vocab-tense-${t}`}>
+                <View style={{ gap: 6, flex: 1 }}>
                   {row.english ? (
                     <View style={styles.translatedLine}>
                       <Text style={styles.tenseEn} selectable>
@@ -413,6 +349,47 @@ export function VocabCard({
               </View>
             );
           })}
+        </View>
+      ) : null}
+
+      {/* TIPS — Native-speaker alternative + memory tip, shown AFTER usage.
+          Suppressed for invalid words (part_of_speech === "other"). */}
+      {(data.part_of_speech || "").toLowerCase() !== "other" &&
+      (data.native_alternative || data.memory_tip) ? (
+        <View style={styles.section}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <Ionicons name="bulb" size={14} color={COLORS.text} />
+            <Text style={styles.sectionLabel}>TIPS</Text>
+          </View>
+
+          {data.native_alternative ? (
+            <View style={[styles.altCard, { marginBottom: 10 }]} testID="vocab-tip-native">
+              <Text style={styles.tipMiniLabel}>NATIVE SPEAKER WOULD SAY</Text>
+              <View style={styles.altWordRow}>
+                <Text style={styles.altWord} selectable>
+                  {data.native_alternative}
+                </Text>
+                <ListenButton text={data.native_alternative} small testID="listen-native" />
+              </View>
+              {data.native_alternative_why ? (
+                <Text style={styles.altWhy} selectable>
+                  Why: {data.native_alternative_why}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          {data.memory_tip ? (
+            <View style={styles.memCard} testID="vocab-tip-memory">
+              <View style={styles.sectionHeader}>
+                <Text style={styles.tipMiniLabel}>HOW TO REMEMBER</Text>
+                <ListenButton text={data.memory_tip} small testID="listen-mem" />
+              </View>
+              <Text style={styles.memText} selectable>
+                {data.memory_tip}
+              </Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -585,6 +562,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSoft,
+  },
+  // Same as tenseRow but without the colored badge column — used after the
+  // PAST/PRESENT/FUTURE badges were removed (UX feedback).
+  tenseRowNoBadge: {
+    flexDirection: "row",
+    gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderSoft,
+  },
+  // Mini-label used inside the TIPS group for the two sub-cards.
+  tipMiniLabel: {
+    fontSize: 10,
+    fontWeight: FONT.black,
+    letterSpacing: 1.4,
+    color: COLORS.textMuted,
+    marginBottom: 6,
   },
   tenseBadge: {
     alignSelf: "flex-start",
