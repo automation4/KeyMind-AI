@@ -28,6 +28,7 @@ import { MicButton } from "@/src/components/MicButton";
 import { DictateLanguagePicker } from "@/src/components/DictateLanguagePicker";
 import { MarkdownText, stripMarkdown } from "@/src/components/MarkdownText";
 import { VocabCard, VocabData, VocabLanguage } from "@/src/components/VocabCard";
+import { useAuth } from "@/src/contexts/AuthContext";
 import { storage } from "@/src/utils/storage";
 
 const VOCAB_LANG_KEY = "keymind_vocab_lang";
@@ -83,6 +84,7 @@ const QUICK_PROMPTS = [
 export default function ChatScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { accentColor } = useTheme();
+  const { refreshUser } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const fab = useScrollFab(scrollRef, { bottomOffset: tabBarHeight + 96 });
   const [sessionId, setSessionId] = useState<string>("");
@@ -156,11 +158,16 @@ export default function ChatScreen() {
       const res = await api.chat(sessionId, message);
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
       scrollToBottom();
+      // Refresh the user's tool-usage counter — chat replies are billed too.
+      refreshUser();
     } catch (e: any) {
       setMessages((m) => [
         ...m,
         { role: "assistant", content: `Error: ${e?.message || "Try again."}` },
       ]);
+      // Even on error, refresh — a 429 may have already bumped the counter
+      // logic and the UI should reflect the latest server state.
+      refreshUser();
     } finally {
       setBusy(false);
     }

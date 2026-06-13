@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { useAuth } from "@/src/contexts/AuthContext";
@@ -48,7 +48,15 @@ type WhitelistEntry = {
 };
 
 export default function SettingsScreen() {
-  const { user, signOut, deviceId } = useAuth();
+  const { user, signOut, deviceId, refreshUser } = useAuth();
+  // Refresh the user (and therefore the daily-usage counter) every time
+  // Settings is focused — guarantees the count never looks stale after the
+  // user runs tools on Home or Chat tabs.
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+    }, [refreshUser]),
+  );
   const tabBarHeight = useBottomTabBarHeight();
   const scrollRef = useRef<ScrollView>(null);
   const fab = useScrollFab(scrollRef, { bottomOffset: tabBarHeight + 16 });
