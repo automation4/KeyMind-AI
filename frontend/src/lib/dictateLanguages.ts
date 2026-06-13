@@ -17,6 +17,7 @@ export const DICTATE_LANGUAGES: DictateLanguage[] = [
   { code: "te-IN", label: "Telugu",         flag: "🇮🇳", nativeName: "తెలుగు" },
   { code: "bn-IN", label: "Bengali",        flag: "🇮🇳", nativeName: "বাংলা" },
   { code: "mr-IN", label: "Marathi",        flag: "🇮🇳", nativeName: "मराठी" },
+  { code: "kok-IN", label: "Konkani",       flag: "🇮🇳", nativeName: "कोंकणी" },
   { code: "gu-IN", label: "Gujarati",       flag: "🇮🇳", nativeName: "ગુજરાતી" },
   { code: "kn-IN", label: "Kannada",        flag: "🇮🇳", nativeName: "ಕನ್ನಡ" },
   { code: "ml-IN", label: "Malayalam",      flag: "🇮🇳", nativeName: "മലയാളം" },

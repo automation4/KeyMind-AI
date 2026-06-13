@@ -53,7 +53,7 @@ const SLIDES: Slide[] = [
   {
     title: "Speak\nLike a Native",
     subtitle:
-      "Learning a new language has never been easier. Get native-sounding phrases, real-time translation & pronunciation help in 20+ tongues.",
+      "Learning a language was never easier than this — get native-sounding phrases, real-time translation & pronunciation help in 20+ tongues.",
     lottie: require("@/src/assets/lottie/globe.json"),
     bg: COLORS.lilac,
     fallbackIcon: "chatbubbles",

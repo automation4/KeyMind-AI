@@ -1,0 +1,39 @@
+{
+  "summary": "Iter16 — Daily AI tool usage counter VERIFIED WORKING end-to-end. 12/12 tests passed. Bug NOT reproducible at the API layer. (1) Guest counter: 3 emoji calls → tool_uses_today=3, remaining=7, Mongo doc tool_usage_count=3, tool_usage_date=2026-06-13. (2) Persistence across logout/login with same device_id: counter survives (still 3). (3) Normal user via /auth/register (counter_test_user_<rand>@gmail.com): 4 emoji calls → tool_uses_today=4 (Mongo confirms tool_usage_count=4). (4) Daily limit enforcement: pushed to 10 → 200, 11th call → 429 with 'Daily limit reached (10/day)' detail. (5) Admin himthegreat@gmail.com (is_premium=true, is_admin=true): 5 emoji calls → Mongo tool_usage_count UNCHANGED (premium bypass works). _user_public also returns tool_uses_remaining=null for admin. (6) Regression — smart_reply 3 suggestions, paraphrase 3 suggestions, TTS nova+coral 200 OK at /api/tts, vocab_full 'resilient' returns populated tenses, gibberish 'zzqxwfg' returns part_of_speech='other'/tenses=None, guest premium denial still holds (is_premium=false, premium_source=null). CONCLUSION: backend logic at _enforce_and_count_usage (line 306) and _user_public (line 232) is CORRECT. If the user is still seeing 0/10 in the UI, the bug is on the frontend side (e.g., not refetching /api/auth/me after each tool call, stale cache, or wrong field being read).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter16_usage_counter.py",
+    "/app/test_reports/pytest/iter16_usage_counter.xml"
+  ],
+  "action_items": [
+    "Backend counter logic is verified correct — no backend fix needed. Main agent should investigate FRONTEND: ensure the client refetches /api/auth/me (or merges the response counter) AFTER every /api/ai/tool call. If the UI caches `user` from initial login and never refreshes, it will permanently show 0/10. Check the AuthContext/zustand store in frontend/app/* for a refresh-after-tool-call effect.",
+    "If frontend already calls /auth/me, verify the FIELD NAME being read in the UI — it must be `tool_uses_today` (not `tool_usage_count` or `usage_today`). _user_public emits `tool_uses_today` and `tool_uses_remaining`."
+  ],
+  "critical_code_review_comments": [
+    "server.py:_enforce_and_count_usage (line 306-325): correct — short-circuits for is_admin/is_premium, recomputes current_count based on today vs stored date, raises 429 at >=10, atomically $set tool_usage_count + tool_usage_date.",
+    "server.py:_user_public (line 232-266): correct — reads stored tool_usage_count only if tool_usage_date == _today_str(), returns tool_uses_remaining=None for premium users (signals 'unlimited' to UI).",
+    "_today_str() is UTC-based; both increment and projection use the same function so there is no timezone drift between bump and read.",
+    "/api/auth/register enforces @gmail.com only (GMAIL_RE) — the review_request's counter_test_user@example.com would 400. Tests use a randomized @gmail.com address to exercise the same code path."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter16_usage_counter.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12)",
+    "frontend": "not tested (backend-only per request)"
+  },
+  "seed_data_creation": "Created and cleaned up: (a) guest user with device_id COUNTER_TEST_GUEST_001_<rand> + a regression guest COUNTER_TEST_GUEST_001_regr_<rand>, (b) registered user counter_test_user_<rand>@gmail.com. Module-scope Mongo fixture purges both on teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter16 confirms the daily-usage counter is working end-to-end on the backend (guest + normal user increment, premium skipped, 429 at 11th call, persistence across login). Next iteration should focus on the FRONTEND: the AuthContext must refetch /api/auth/me after every successful /api/ai/tool call (or the API can be extended to return updated usage in the tool response itself — a cleaner design). Test file /app/backend/tests/test_iter16_usage_counter.py covers the counter scenarios + a smart_reply/paraphrase/TTS/vocab regression, runs in ~30s, all 12 cases passing.",
+  "rca_of_issue": "User reported 'counter stays at 0/10'. Backend reproduction attempts FAILED — both _enforce_and_count_usage and _user_public are correct and verified against the actual Mongo document. The bug therefore lives on the client side. Most likely causes (in order of probability): (1) Frontend stores the user object in a local cache/context after login and never refetches /api/auth/me after /api/ai/tool calls, so tool_uses_today stays at whatever it was at login (0). (2) Frontend may be reading a wrong/legacy field name from the response (e.g., tool_usage_count instead of tool_uses_today). (3) Concurrency: if multiple tool calls fire from the UI in parallel, server applies each $set correctly but the UI may overwrite remaining with the response of an earlier call. Mitigation: extend /api/ai/tool response to include the updated `tool_uses_today` + `tool_uses_remaining` from _user_public, and have the UI store overwrite from that — eliminates the need for a separate /auth/me roundtrip."
+}

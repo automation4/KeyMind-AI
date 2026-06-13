@@ -61,7 +61,7 @@ export default function WriteScreen() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ResultPayload | null>(null);
   const [optionsOpen, setOptionsOpen] = useState<string | null>(null);
-  const [appliedToast, setAppliedToast] = useState(false);
+  const [appliedToast, setAppliedToast] = useState<string | null>(null);
   const [pendingOptions, setPendingOptions] = useState<Record<string, string>>({});
   const [toolPickerOpen, setToolPickerOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -105,9 +105,17 @@ export default function WriteScreen() {
     [text],
   );
 
-  const showToast = () => {
-    setAppliedToast(true);
-    setTimeout(() => setAppliedToast(false), 1500);
+  const showToast = (msg: string = "Applied") => {
+    setAppliedToast(msg);
+    setTimeout(() => setAppliedToast(null), 1500);
+  };
+
+  const copy = async (s: string) => {
+    await Clipboard.setStringAsync(s);
+    // Re-introduced in-app confirmation — white pill, black text — at the
+    // user's request. Android 13+ may also flash its own system "Copied" pill
+    // which we can't suppress; ours is the on-brand visible one.
+    showToast("Copied");
   };
 
   const runTool = async (toolId: string, options: Record<string, any> = {}) => {
@@ -185,14 +193,6 @@ export default function WriteScreen() {
         await api.saveHistory(activeTool, result?.original || "", suggestion);
       } catch {}
     }
-  };
-
-  const copy = async (s: string) => {
-    // Android 13+ already shows a system "Copied" confirmation when a string is
-    // written to the clipboard — duplicating it with our in-app toast was
-    // creating the "two popups" the user reported. We just write the value and
-    // let the OS handle the user-facing acknowledgement.
-    await Clipboard.setStringAsync(s);
   };
 
   const dismiss = () => setResult(null);
@@ -457,9 +457,13 @@ export default function WriteScreen() {
       />
 
       {appliedToast && (
-        <View style={[styles.toast, { backgroundColor: accentColor }]} testID="applied-toast">
-          <Ionicons name="checkmark-circle" size={18} color={COLORS.text} />
-          <Text style={[styles.toastText, { color: COLORS.text }]}>Applied</Text>
+        <View style={[styles.toast, { backgroundColor: "#ffffff" }]} testID="applied-toast">
+          <Ionicons
+            name={appliedToast === "Copied" ? "copy-outline" : "checkmark-circle"}
+            size={18}
+            color={COLORS.text}
+          />
+          <Text style={[styles.toastText, { color: COLORS.text }]}>{appliedToast}</Text>
         </View>
       )}
 

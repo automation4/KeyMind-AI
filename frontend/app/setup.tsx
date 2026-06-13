@@ -11,7 +11,7 @@ import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/AuthContext";
 
 const LANGUAGES = [
-  "English", "Hindi", "Sanskrit", "Hinglish", "Bengali", "Tamil", "Telugu", "Marathi",
+  "English", "Hindi", "Sanskrit", "Hinglish", "Bengali", "Tamil", "Telugu", "Marathi", "Konkani",
   "Gujarati", "Kannada", "Malayalam", "Punjabi", "Odia", "Urdu", "Assamese",
 ];
 
