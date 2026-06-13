@@ -178,7 +178,7 @@ export function WriteInputCard({
           <TouchableOpacity
             onPress={handleUpload}
             disabled={ocrBusy}
-            style={[styles.iconBtn, { backgroundColor: COLORS.mint }]}
+            style={[styles.iconBtn, { backgroundColor: "#ffffff" }]}
             testID="upload-image-btn"
             accessibilityLabel={ocrBusy ? "Reading image" : "Upload image"}
           >

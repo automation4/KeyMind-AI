@@ -353,7 +353,7 @@ export default function ChatScreen() {
           )}
         </ScrollView>
 
-        <View style={[styles.composer, { paddingBottom: 12 + tabBarHeight }]}>
+        <View style={[styles.composer, { paddingBottom: 12 }]}>
           <View style={styles.composerLangRow}>
             <DictateLanguagePicker compact />
           </View>

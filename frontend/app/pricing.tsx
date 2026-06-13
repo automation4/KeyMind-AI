@@ -168,20 +168,20 @@ export default function Pricing() {
         </View>
 
         {!isAdminGranted && isGuest && (
-          <View style={[styles.banner, { backgroundColor: COLORS.peach }]} testID="guest-signin-banner">
-            <Ionicons name="log-in-outline" size={20} color={COLORS.text} />
+          <View style={[styles.banner, { backgroundColor: COLORS.text }]} testID="guest-signin-banner">
+            <Ionicons name="log-in-outline" size={20} color="#ffffff" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.bannerTitle}>Sign in to upgrade</Text>
-              <Text style={styles.bannerSub}>
+              <Text style={[styles.bannerTitle, { color: "#ffffff" }]}>Sign in to upgrade</Text>
+              <Text style={[styles.bannerSub, { color: "#ffffff", opacity: 0.85 }]}>
                 Premium upgrades are tied to your account. Sign in with Google or email to choose a plan.
               </Text>
             </View>
             <TouchableOpacity
-              style={styles.signInBtn}
+              style={[styles.signInBtn, { backgroundColor: "#ffffff" }]}
               onPress={() => router.replace("/login")}
               testID="guest-signin-btn"
             >
-              <Text style={styles.signInBtnText}>SIGN IN</Text>
+              <Text style={[styles.signInBtnText, { color: COLORS.text }]}>SIGN IN</Text>
             </TouchableOpacity>
           </View>
         )}

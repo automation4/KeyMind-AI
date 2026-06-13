@@ -188,8 +188,11 @@ export default function WriteScreen() {
   };
 
   const copy = async (s: string) => {
+    // Android 13+ already shows a system "Copied" confirmation when a string is
+    // written to the clipboard — duplicating it with our in-app toast was
+    // creating the "two popups" the user reported. We just write the value and
+    // let the OS handle the user-facing acknowledgement.
     await Clipboard.setStringAsync(s);
-    showToast();
   };
 
   const dismiss = () => setResult(null);
@@ -454,9 +457,9 @@ export default function WriteScreen() {
       />
 
       {appliedToast && (
-        <View style={styles.toast} testID="applied-toast">
-          <Ionicons name="checkmark-circle" size={18} color={COLORS.bg} />
-          <Text style={styles.toastText}>Done</Text>
+        <View style={[styles.toast, { backgroundColor: accentColor }]} testID="applied-toast">
+          <Ionicons name="checkmark-circle" size={18} color={COLORS.text} />
+          <Text style={[styles.toastText, { color: COLORS.text }]}>Applied</Text>
         </View>
       )}
 

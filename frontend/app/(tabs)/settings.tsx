@@ -261,16 +261,16 @@ export default function SettingsScreen() {
         {/* Sign-in CTA for guests in place of Go Premium */}
         {!isPremium && user?.is_guest && (
           <TouchableOpacity
-            style={[styles.proCard, { backgroundColor: COLORS.peach }]}
+            style={[styles.proCard, { backgroundColor: COLORS.text }]}
             onPress={() => router.replace("/login")}
             testID="settings-signin-btn"
           >
             <View style={{ flex: 1 }}>
-              <Text style={styles.proEyebrow}>SIGN IN TO UPGRADE</Text>
-              <Text style={styles.proTitle}>Sign in</Text>
-              <Text style={styles.proSub}>Premium upgrades are tied to your account.</Text>
+              <Text style={[styles.proEyebrow, { color: "#ffffff", opacity: 0.85 }]}>SIGN IN TO UPGRADE</Text>
+              <Text style={[styles.proTitle, { color: "#ffffff" }]}>Sign in</Text>
+              <Text style={[styles.proSub, { color: "#ffffff", opacity: 0.85 }]}>Premium upgrades are tied to your account.</Text>
             </View>
-            <Ionicons name="log-in-outline" size={32} color={COLORS.text} />
+            <Ionicons name="log-in-outline" size={32} color="#ffffff" />
           </TouchableOpacity>
         )}
 

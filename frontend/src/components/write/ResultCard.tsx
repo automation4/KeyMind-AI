@@ -91,14 +91,8 @@ export function ResultSuggestion({
           <Ionicons name="checkmark" size={16} color={COLORS.bg} />
           <Text style={styles.applyText}>APPLY</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.dismissBtn}
-          onPress={() => onCopy(copyValue)}
-          testID={`copy-btn-${index}`}
-        >
-          <Ionicons name="copy-outline" size={14} color={COLORS.text} />
-          <Text style={styles.dismissText}>COPY</Text>
-        </TouchableOpacity>
+        {/* COPY button removed — long-press on the card already copies, the
+            redundant button caused two-toast confusion (system + in-app). */}
         {result.tool === "idioms" ? (
           <ListenButton text={suggestion} small testID={`listen-idiom-${index}`} />
         ) : null}
@@ -274,14 +268,7 @@ export function SummaryCard({
           <Ionicons name="checkmark" size={16} color={COLORS.bg} />
           <Text style={styles.applyText}>APPLY</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.dismissBtn}
-          onPress={() => onCopy(combined)}
-          testID="copy-summary"
-        >
-          <Ionicons name="copy-outline" size={14} color={COLORS.text} />
-          <Text style={styles.dismissText}>COPY</Text>
-        </TouchableOpacity>
+        {/* COPY button removed — long-press the card to copy. */}
       </View>
     </View>
   );
