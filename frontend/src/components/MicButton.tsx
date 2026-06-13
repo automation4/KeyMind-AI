@@ -147,7 +147,7 @@ export function MicButton({
           <Ionicons
             name={listening ? "square" : "mic"}
             size={Math.round(size * 0.5)}
-            color={listening ? COLORS.bg : COLORS.text}
+            color="#ffffff"
           />
         </TouchableOpacity>
       </Animated.View>

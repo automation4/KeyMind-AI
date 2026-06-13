@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 
@@ -10,6 +11,7 @@ import { PatternBackground } from "@/src/components/PatternBackground";
 import { TOOL_BY_ID } from "@/src/lib/tools";
 import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
+import { useScrollFab } from "@/src/components/ScrollFab";
 
 type Item = {
   id: string;
@@ -20,6 +22,9 @@ type Item = {
 };
 
 export default function HistoryScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
+  const scrollRef = useRef<ScrollView>(null);
+  const fab = useScrollFab(scrollRef, { bottomOffset: tabBarHeight + 16 });
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -95,8 +100,13 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{ padding: 20, paddingBottom: 24 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+          onScroll={fab.onScroll}
+          scrollEventThrottle={fab.scrollEventThrottle}
+          onLayout={fab.onLayout}
+          onContentSizeChange={fab.onContentSizeChange}
         >
           <AdBanner placement="top" />
           {items.length === 0 ? (
@@ -134,6 +144,7 @@ export default function HistoryScreen() {
           )}
         </ScrollView>
       )}
+      {fab.fab}
     </SafeAreaView>
   );
 }

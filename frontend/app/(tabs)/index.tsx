@@ -17,6 +17,8 @@ import * as Haptics from "expo-haptics";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { TOOL_BY_ID, TOOLS } from "@/src/lib/tools";
 import { api } from "@/src/lib/api";
+import { useScrollFab } from "@/src/components/ScrollFab";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { PatternBackground } from "@/src/components/PatternBackground";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useTheme } from "@/src/contexts/ThemeContext";
@@ -50,6 +52,9 @@ const VOCAB_LANG_KEY = "keymind_vocab_lang";
 export default function WriteScreen() {
   const { user, refreshUser } = useAuth();
   const { accentColor } = useTheme();
+  const tabBarHeight = useBottomTabBarHeight();
+  const scrollRef = React.useRef<ScrollView>(null);
+  const fab = useScrollFab(scrollRef, { bottomOffset: tabBarHeight + 16 });
   const [text, setText] = useState("");
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -219,9 +224,14 @@ export default function WriteScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
+        onScroll={fab.onScroll}
+        scrollEventThrottle={fab.scrollEventThrottle}
+        onLayout={fab.onLayout}
+        onContentSizeChange={fab.onContentSizeChange}
       >
         <AdBanner placement="top" />
 
@@ -419,6 +429,8 @@ export default function WriteScreen() {
           </View>
         )}
       </ScrollView>
+
+      {fab.fab}
 
       <ToolPickerSheet
         visible={toolPickerOpen}

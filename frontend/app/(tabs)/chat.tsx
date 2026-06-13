@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { useTheme } from "@/src/contexts/ThemeContext";
+import { useScrollFab } from "@/src/components/ScrollFab";
 import { api } from "@/src/lib/api";
 import { PatternBackground } from "@/src/components/PatternBackground";
 import { ListenButton } from "@/src/components/ListenButton";
@@ -82,6 +83,8 @@ const QUICK_PROMPTS = [
 export default function ChatScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { accentColor } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  const fab = useScrollFab(scrollRef, { bottomOffset: tabBarHeight + 96 });
   const [sessionId, setSessionId] = useState<string>("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -89,7 +92,6 @@ export default function ChatScreen() {
   const [vocabLang, setVocabLang] = useState<VocabLanguage>("Hindi");
   const [chatInterim, setChatInterim] = useState("");
   const [chatListening, setChatListening] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
   // Track whether we should auto-scroll to bottom when ScrollView content size changes.
   // Set to true ONLY right after a new message is added — prevents listen-button taps
   // (or any other in-card state change that resizes content) from yanking the scroll.
@@ -195,11 +197,11 @@ export default function ChatScreen() {
           <Text style={styles.title}>Ask me anything.</Text>
         </View>
         <TouchableOpacity
-          style={[styles.resetBtn, { backgroundColor: accentColor }]}
+          style={[styles.resetBtn, { backgroundColor: "#ffffff" }]}
           onPress={reset}
           testID="chat-reset-btn"
         >
-          <Ionicons name="refresh" size={18} color={COLORS.text} />
+          <Ionicons name="refresh" size={18} color={accentColor} />
         </TouchableOpacity>
       </View>
 
@@ -216,7 +218,11 @@ export default function ChatScreen() {
           ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 20, paddingBottom: 24 }}
-          onContentSizeChange={() => {
+          onScroll={fab.onScroll}
+          scrollEventThrottle={fab.scrollEventThrottle}
+          onLayout={fab.onLayout}
+          onContentSizeChange={(w, h) => {
+            fab.onContentSizeChange(w, h);
             // Only scroll to the bottom when explicitly requested by the parent
             // (i.e. after a new message was just added). This prevents in-card
             // interactions like LISTEN button taps from jumping the scroll position.
@@ -389,18 +395,19 @@ export default function ChatScreen() {
             <TouchableOpacity
               style={[
                 styles.sendBtn,
-                { backgroundColor: accentColor },
+                { backgroundColor: "#ffffff" },
                 (!input.trim() || busy) && { opacity: 0.5 },
               ]}
               onPress={() => send()}
               disabled={!input.trim() || busy}
               testID="chat-send-btn"
             >
-              <Ionicons name="arrow-up" size={20} color={COLORS.text} />
+              <Ionicons name="arrow-up" size={20} color={accentColor} />
             </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
+      {fab.fab}
     </SafeAreaView>
   );
 }

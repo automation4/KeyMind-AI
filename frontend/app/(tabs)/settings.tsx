@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
@@ -23,6 +24,7 @@ import { useTheme, AccentName, PatternName, ThemeMode } from "@/src/contexts/The
 import { PatternBackground, PatternSvg, PATTERNS } from "@/src/components/PatternBackground";
 import { AccentColorPicker } from "@/src/components/AccentColorPicker";
 import { api } from "@/src/lib/api";
+import { useScrollFab } from "@/src/components/ScrollFab";
 
 type AccentDef = { id: AccentName; color: string };
 
@@ -47,6 +49,9 @@ type WhitelistEntry = {
 
 export default function SettingsScreen() {
   const { user, signOut, deviceId } = useAuth();
+  const tabBarHeight = useBottomTabBarHeight();
+  const scrollRef = useRef<ScrollView>(null);
+  const fab = useScrollFab(scrollRef, { bottomOffset: tabBarHeight + 16 });
   const { mode, accent, customAccent, pattern, setMode, setAccent, setCustomAccent, setPattern, accentColor } = useTheme();
   const router = useRouter();
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
@@ -163,8 +168,13 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <PatternBackground />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
+        onScroll={fab.onScroll}
+        scrollEventThrottle={fab.scrollEventThrottle}
+        onLayout={fab.onLayout}
+        onContentSizeChange={fab.onContentSizeChange}
       >
         <Text style={styles.eyebrow}>YOU</Text>
         <Text style={styles.title}>Settings.</Text>
@@ -586,6 +596,7 @@ export default function SettingsScreen() {
 
         <Text style={styles.footer}>KeyMind AI · v1.0 · Built for writers everywhere.</Text>
       </ScrollView>
+      {fab.fab}
     </SafeAreaView>
   );
 }
