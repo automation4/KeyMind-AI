@@ -260,16 +260,24 @@ export default function SettingsScreen() {
         {/* Premium CTA for non-premium users — hidden for guests (must sign in first) */}
         {!isPremium && !user?.is_guest && (
           <TouchableOpacity
-            style={[styles.proCard, { backgroundColor: COLORS.primary }]}
+            activeOpacity={0.85}
             onPress={() => router.push("/pricing")}
             testID="settings-pricing-btn"
+            style={styles.signInGradientWrap}
           >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.proEyebrow}>UNLIMITED & AD-FREE</Text>
-              <Text style={styles.proTitle}>Go Premium</Text>
-              <Text style={styles.proSub}>From ₹250/week · Cancel anytime</Text>
-            </View>
-            <Ionicons name="arrow-forward-circle" size={36} color={COLORS.onPrimary} />
+            <LinearGradient
+              colors={SIGNIN_GRADIENT as unknown as string[]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.signInGradientInner}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.proEyebrow, { color: "#ffffff", opacity: 0.95 }]}>UNLIMITED & AD-FREE</Text>
+                <Text style={[styles.proTitle, { color: "#ffffff" }]}>Go Premium</Text>
+                <Text style={[styles.proSub, { color: "#ffffff", opacity: 0.9 }]}>From ₹250/week · Cancel anytime</Text>
+              </View>
+              <Ionicons name="arrow-forward-circle" size={36} color="#ffffff" />
+            </LinearGradient>
           </TouchableOpacity>
         )}
 
