@@ -91,15 +91,13 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
     setContentHeight(contentSize.height);
 
     // Flip the arrow based on actual scroll *direction* — not just position.
-    // Swiping up (content rising into view) → user wants to keep going up,
-    // so the FAB should offer to jump to the top (↑).
-    // Swiping down → arrow becomes ↓ (jump to bottom).
-    // Small jitters are ignored (|dy| < 1).
     if (Math.abs(dy) >= 1) {
       const next: "up" | "down" = dy > 0 ? "down" : "up";
       setDirection((prev) => (prev === next ? prev : next));
+      // Any real scroll movement re-arms the 5-second visibility window.
+      bumpVisibility();
     }
-  }, []);
+  }, [bumpVisibility]);
 
   const onContentSizeChange = useCallback((_w: number, h: number) => {
     setContentHeight(h);
@@ -110,7 +108,41 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   }, []);
 
   const maxScroll = Math.max(0, contentHeight - layoutHeight);
-  const visible = maxScroll > minScrollable;
+  const scrollable = maxScroll > minScrollable;
+
+  // Auto-show / auto-hide: the FAB is invisible until the user scrolls. After
+  // the most recent scroll event we keep it visible for 5 seconds (or as long
+  // as the user is actively dragging), then fade out so the UI stays clean.
+  const [shown, setShown] = useState(false);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visible = scrollable && shown;
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const bumpVisibility = useCallback(() => {
+    setShown(true);
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => setShown(false), 5000);
+  }, [clearHideTimer]);
+
+  // Fade opacity in/out smoothly on visibility change.
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: visible ? 1 : 0,
+      duration: visible ? 180 : 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [visible, opacity]);
+
+  // Cleanup on unmount.
+  useEffect(() => () => clearHideTimer(), [clearHideTimer]);
 
   // Smoothly animate the icon rotation whenever the direction flips.
   useEffect(() => {
@@ -165,6 +197,8 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
         startedAtRef.current = Date.now();
         dragDyRef.current = 0;
         setDragging(true);
+        // Keep the FAB on-screen while the user is interacting with it.
+        bumpVisibility();
       },
       onPanResponderMove: (_evt, g) => {
         dragDyRef.current = g.dy;
@@ -172,6 +206,7 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
         if (!intervalRef.current && Math.abs(g.dy) >= deadZone) {
           startLoop();
         }
+        bumpVisibility();
       },
       onPanResponderRelease: (_evt, g) => {
         const wasTap =
@@ -200,37 +235,44 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   // Cleanup on unmount.
   useEffect(() => () => stopLoop(), [stopLoop]);
 
-  const fab: ReactNode = visible ? (
-    <View
-      {...pan.panHandlers}
+  const fab: ReactNode = scrollable ? (
+    <Animated.View
+      pointerEvents={visible ? "auto" : "none"}
       style={{
         position: "absolute",
         right: rightOffset,
         bottom: bottomOffset,
-        width: 48,
-        height: 48,
-        borderRadius: 999,
-        backgroundColor: COLORS.text, // ALWAYS black, ignores accent theme
-        borderWidth: 2,
-        borderColor: COLORS.border,
-        alignItems: "center",
-        justifyContent: "center",
-        shadowColor: "#000",
-        shadowOpacity: dragging ? 0.3 : 0.18,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-        elevation: dragging ? 8 : 5,
-        transform: [{ scale: dragging ? 1.1 : 1 }],
+        opacity,
       }}
-      testID={`scroll-fab-${direction}`}
-      accessibilityLabel={
-        direction === "down" ? "Jump to bottom (drag to scroll)" : "Jump to top (drag to scroll)"
-      }
     >
-      <Animated.View style={{ transform: [{ rotate: iconSpin }] }}>
-        <Ionicons name="arrow-down" size={22} color="#ffffff" />
-      </Animated.View>
-    </View>
+      <View
+        {...pan.panHandlers}
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 999,
+          backgroundColor: COLORS.text, // ALWAYS black, ignores accent theme
+          borderWidth: 2,
+          borderColor: COLORS.border,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#000",
+          shadowOpacity: dragging ? 0.3 : 0.18,
+          shadowOffset: { width: 0, height: 2 },
+          shadowRadius: 4,
+          elevation: dragging ? 8 : 5,
+          transform: [{ scale: dragging ? 1.1 : 1 }],
+        }}
+        testID={`scroll-fab-${direction}`}
+        accessibilityLabel={
+          direction === "down" ? "Jump to bottom (drag to scroll)" : "Jump to top (drag to scroll)"
+        }
+      >
+        <Animated.View style={{ transform: [{ rotate: iconSpin }] }}>
+          <Ionicons name="arrow-down" size={22} color="#ffffff" />
+        </Animated.View>
+      </View>
+    </Animated.View>
   ) : null;
 
   return { onScroll, onContentSizeChange, onLayout, fab, scrollEventThrottle: 16 };

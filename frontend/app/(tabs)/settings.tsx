@@ -17,6 +17,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+
+// Vivid blue → purple → pink → red gradient used on the "Sign in to upgrade"
+// card. Matches the reference screenshot the user provided.
+const SIGNIN_GRADIENT = ["#3b5bf2", "#7a3cf4", "#c93cd2", "#ff3a6b", "#ff5c2f"] as const;
 
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { useAuth } from "@/src/contexts/AuthContext";
@@ -29,7 +34,9 @@ import { useScrollFab } from "@/src/components/ScrollFab";
 type AccentDef = { id: AccentName; color: string };
 
 // All accents are available to everyone. KeyMind has no public premium tier.
+// Black ("ink") is the default and appears first.
 const ACCENTS: AccentDef[] = [
+  { id: "ink", color: COLORS.text },
   { id: "orange", color: COLORS.primary },
   { id: "yellow", color: COLORS.secondary },
   { id: "mint", color: COLORS.mint },
@@ -269,16 +276,24 @@ export default function SettingsScreen() {
         {/* Sign-in CTA for guests in place of Go Premium */}
         {!isPremium && user?.is_guest && (
           <TouchableOpacity
-            style={[styles.proCard, { backgroundColor: COLORS.text }]}
+            activeOpacity={0.85}
             onPress={() => router.replace("/login")}
             testID="settings-signin-btn"
+            style={styles.signInGradientWrap}
           >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.proEyebrow, { color: "#ffffff", opacity: 0.85 }]}>SIGN IN TO UPGRADE</Text>
-              <Text style={[styles.proTitle, { color: "#ffffff" }]}>Sign in</Text>
-              <Text style={[styles.proSub, { color: "#ffffff", opacity: 0.85 }]}>Premium upgrades are tied to your account.</Text>
-            </View>
-            <Ionicons name="log-in-outline" size={32} color="#ffffff" />
+            <LinearGradient
+              colors={SIGNIN_GRADIENT as unknown as string[]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.signInGradientInner}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.proEyebrow, { color: "#ffffff", opacity: 0.95 }]}>SIGN IN TO UPGRADE</Text>
+                <Text style={[styles.proTitle, { color: "#ffffff" }]}>Sign in</Text>
+                <Text style={[styles.proSub, { color: "#ffffff", opacity: 0.9 }]}>Premium upgrades are tied to your account.</Text>
+              </View>
+              <Ionicons name="log-in-outline" size={32} color="#ffffff" />
+            </LinearGradient>
           </TouchableOpacity>
         )}
 
@@ -689,6 +704,16 @@ const styles = StyleSheet.create({
   proCard: {
     marginTop: 16, padding: 18, borderRadius: RADIUS.lg, borderWidth: 3, borderColor: COLORS.border,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center", ...SHADOW.brutal,
+  },
+  // Gradient version of proCard — wrapper handles the brutal border + shadow,
+  // inner LinearGradient owns the colorful fill so the gradient never leaks
+  // past the rounded corners.
+  signInGradientWrap: {
+    marginTop: 16, borderRadius: RADIUS.lg, borderWidth: 3, borderColor: COLORS.border,
+    overflow: "hidden", ...SHADOW.brutal,
+  },
+  signInGradientInner: {
+    padding: 18, flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
   proEyebrow: { fontSize: 11, fontWeight: FONT.black, color: COLORS.onPrimary, letterSpacing: 1.5 },
   proTitle: { marginTop: 4, fontSize: 24, fontWeight: FONT.black, color: COLORS.onPrimary, letterSpacing: -1 },

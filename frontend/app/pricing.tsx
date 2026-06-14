@@ -5,6 +5,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+
+// Vivid blue → purple → pink → red gradient shared with the Settings sign-in
+// card so the "Sign in to upgrade" call-to-action looks consistent everywhere.
+const SIGNIN_GRADIENT = ["#3b5bf2", "#7a3cf4", "#c93cd2", "#ff3a6b", "#ff5c2f"] as const;
 
 import { COLORS, FONT, RADIUS, SHADOW } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
@@ -168,21 +173,28 @@ export default function Pricing() {
         </View>
 
         {!isAdminGranted && isGuest && (
-          <View style={[styles.banner, { backgroundColor: COLORS.text }]} testID="guest-signin-banner">
-            <Ionicons name="log-in-outline" size={20} color="#ffffff" />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.bannerTitle, { color: "#ffffff" }]}>Sign in to upgrade</Text>
-              <Text style={[styles.bannerSub, { color: "#ffffff", opacity: 0.85 }]}>
-                Premium upgrades are tied to your account. Sign in with Google or email to choose a plan.
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.signInBtn, { backgroundColor: "#ffffff" }]}
-              onPress={() => router.replace("/login")}
-              testID="guest-signin-btn"
+          <View style={styles.signInGradientWrap} testID="guest-signin-banner">
+            <LinearGradient
+              colors={SIGNIN_GRADIENT as unknown as string[]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.signInGradientInner}
             >
-              <Text style={[styles.signInBtnText, { color: COLORS.text }]}>SIGN IN</Text>
-            </TouchableOpacity>
+              <Ionicons name="log-in-outline" size={20} color="#ffffff" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.bannerTitle, { color: "#ffffff" }]}>Sign in to upgrade</Text>
+                <Text style={[styles.bannerSub, { color: "#ffffff", opacity: 0.9 }]}>
+                  Premium upgrades are tied to your account. Sign in with Google or email to choose a plan.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.signInBtn, { backgroundColor: "#ffffff" }]}
+                onPress={() => router.replace("/login")}
+                testID="guest-signin-btn"
+              >
+                <Text style={[styles.signInBtnText, { color: COLORS.text }]}>SIGN IN</Text>
+              </TouchableOpacity>
+            </LinearGradient>
           </View>
         )}
 
@@ -286,6 +298,15 @@ const styles = StyleSheet.create({
   },
   bannerTitle: { fontSize: 14, fontWeight: FONT.black, color: COLORS.text },
   bannerSub: { marginTop: 2, fontSize: 12, color: COLORS.text, opacity: 0.85 },
+
+  // Gradient banner version (sign-in CTA for guests).
+  signInGradientWrap: {
+    marginTop: 20, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border,
+    overflow: "hidden", ...SHADOW.brutalSm,
+  },
+  signInGradientInner: {
+    padding: 14, flexDirection: "row", alignItems: "center", gap: 10,
+  },
 
   signInBtn: {
     paddingHorizontal: 14, paddingVertical: 10,

@@ -3,7 +3,7 @@ import { storage } from "@/src/utils/storage";
 import { COLORS } from "@/src/lib/theme";
 
 export type ThemeMode = "light" | "dark" | "matte";
-export type AccentName = "orange" | "yellow" | "mint" | "peach" | "sky" | "lilac";
+export type AccentName = "ink" | "orange" | "yellow" | "mint" | "peach" | "sky" | "lilac";
 export type PatternName =
   | "classic"
   | "dots"
@@ -35,6 +35,7 @@ type ThemeState = {
 };
 
 const accentMap: Record<AccentName, string> = {
+  ink: COLORS.text,
   orange: COLORS.primary,
   yellow: COLORS.secondary,
   mint: COLORS.mint,
@@ -61,7 +62,7 @@ const ThemeContext = createContext<ThemeState | null>(null);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mode, setModeState] = useState<ThemeMode>("light");
-  const [accent, setAccentState] = useState<AccentName>("orange");
+  const [accent, setAccentState] = useState<AccentName>("ink");
   const [customAccent, setCustomAccentState] = useState<string | null>(null);
   const [pattern, setPatternState] = useState<PatternName>("classic");
 
