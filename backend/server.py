@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import ReturnDocument
+import hashlib
 import os
 import logging
 import uuid
@@ -443,17 +444,38 @@ async def google_login(body: GoogleAuthRequest):
 
 
 @api.post("/auth/guest")
-async def create_guest(body: Optional[GuestAuth] = None):
+async def create_guest(
+    request: Request,
+    body: Optional[GuestAuth] = None,
+):
     """Atomically get-or-create a guest account anchored to the caller's stable
     device id. Uses find_one_and_update(upsert=True) so two concurrent calls
     with the same device_id resolve to the SAME document — preventing duplicate
     guest accounts that would silently reset the user's daily tool-usage count.
 
-    The today-vs-stored daily reset still works as before via _user_public /
-    _bump_tool_usage; this endpoint only ensures the document is unique and
-    persistent per device.
+    When the client cannot provide a stable device id (older builds, web
+    sandboxes, edge cases where Application.getAndroidId/getIosIdForVendor
+    returns null) we derive a deterministic SERVER-SIDE fingerprint from
+    `client_ip + user_agent`. This is good enough to bind the same guest to
+    the same browser/device for the next ~24h — preventing the "counter
+    always reads 0" bug seen in the field.
     """
     device_id = (body.device_id or "").strip() if body else ""
+    derived = False
+    if not device_id:
+        ua = (request.headers.get("user-agent") or "").strip()
+        ip = (request.client.host if request.client else "") or "no-ip"
+        if ua or ip != "no-ip":
+            digest = hashlib.sha256(f"{ip}|{ua}".encode("utf-8")).hexdigest()
+            device_id = f"srv_{digest[:24]}"
+            derived = True
+    logger.info(
+        "guest auth — device_id=%s (derived=%s, sent=%s)",
+        (device_id[:24] + "…") if device_id else "<empty>",
+        derived,
+        bool(body and body.device_id),
+    )
+
     user: Optional[Dict[str, Any]] = None
     now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -473,6 +495,7 @@ async def create_guest(body: Optional[GuestAuth] = None):
                     "is_admin": False,
                     "is_premium": False,
                     "guest_device_id": device_id,
+                    "device_id_source": "client" if not derived else "server-fingerprint",
                     "created_at": now_iso,
                 },
                 "$set": {"last_seen_at": now_iso},
@@ -482,9 +505,7 @@ async def create_guest(body: Optional[GuestAuth] = None):
             projection={"_id": 0},
         )
     else:
-        # No device id available (e.g. unsupported web client) — fall back to a
-        # one-shot ephemeral guest. These cannot survive a sign-out/reinstall
-        # and will be metered fresh each session.
+        # Truly anonymous (no IP, no UA — should never happen) — single-use guest.
         user_id = f"guest_{uuid.uuid4().hex[:12]}"
         user = {
             "user_id": user_id,

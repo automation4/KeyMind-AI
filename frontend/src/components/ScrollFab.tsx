@@ -7,11 +7,11 @@ import {
   ScrollView,
   PanResponder,
   Animated,
+  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { COLORS } from "@/src/lib/theme";
-import { useTheme } from "@/src/contexts/ThemeContext";
 
 type ScrollRefLike = React.RefObject<ScrollView | any>;
 
@@ -44,12 +44,28 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   const maxScrollSpeed = opts.maxScrollSpeed ?? 36; // px / tick
   const deadZone = opts.deadZone ?? 8;
   const maxDragDistance = opts.maxDragDistance ?? 180; // saturate at ~180px
-  const { accentColor } = useTheme();
 
   const [scrollY, setScrollY] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
   const [layoutHeight, setLayoutHeight] = useState(0);
   const [dragging, setDragging] = useState(false);
+
+  // Direction is sticky: flips based on the LAST scroll-velocity sign so the
+  // FAB never flickers when the user is sitting still near the midpoint.
+  // Defaults to "down" on first render (top of content), flips to "up" once
+  // the user has scrolled most of the way down OR scrolls upward from a
+  // non-top position.
+  const [direction, setDirection] = useState<"up" | "down">("down");
+  // Ref mirror — PanResponder is built once via useRef so its closure-captured
+  // `direction` would never update without this.
+  const directionRef = useRef<"up" | "down">("down");
+  useEffect(() => {
+    directionRef.current = direction;
+  }, [direction]);
+
+  // Animated rotation for the icon — 0deg = ↓, 180deg = ↑ (we render arrow-down
+  // and flip it for the up direction so the swap is one continuous spin).
+  const rotation = useRef(new Animated.Value(0)).current;
 
   // Refs mirror the latest values so the drag interval reads fresh data
   // without re-creating the PanResponder on every render.
@@ -64,11 +80,25 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   useEffect(() => { contentRef.current = contentHeight; }, [contentHeight]);
   useEffect(() => { layoutRef.current = layoutHeight; }, [layoutHeight]);
 
+  const lastScrollY = useRef(0);
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
-    setScrollY(contentOffset.y);
+    const y = contentOffset.y;
+    const dy = y - lastScrollY.current;
+    lastScrollY.current = y;
+    setScrollY(y);
     setLayoutHeight(layoutMeasurement.height);
     setContentHeight(contentSize.height);
+
+    // Flip the arrow based on actual scroll *direction* — not just position.
+    // Swiping up (content rising into view) → user wants to keep going up,
+    // so the FAB should offer to jump to the top (↑).
+    // Swiping down → arrow becomes ↓ (jump to bottom).
+    // Small jitters are ignored (|dy| < 1).
+    if (Math.abs(dy) >= 1) {
+      const next: "up" | "down" = dy > 0 ? "down" : "up";
+      setDirection((prev) => (prev === next ? prev : next));
+    }
   }, []);
 
   const onContentSizeChange = useCallback((_w: number, h: number) => {
@@ -80,12 +110,22 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   }, []);
 
   const maxScroll = Math.max(0, contentHeight - layoutHeight);
-  const direction: "up" | "down" | null =
-    maxScroll <= minScrollable
-      ? null
-      : scrollY < maxScroll / 2
-        ? "down"
-        : "up";
+  const visible = maxScroll > minScrollable;
+
+  // Smoothly animate the icon rotation whenever the direction flips.
+  useEffect(() => {
+    Animated.timing(rotation, {
+      toValue: direction === "up" ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [direction, rotation]);
+
+  const iconSpin = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "180deg"],
+  });
 
   const stopLoop = useCallback(() => {
     if (intervalRef.current) {
@@ -143,10 +183,9 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
         setDragging(false);
 
         if (wasTap) {
-          // Use the latest direction at release time, not stale closure value.
-          const max = Math.max(0, contentRef.current - layoutRef.current);
-          const isDown = scrollYRef.current < max / 2;
-          if (isDown) scrollRef.current?.scrollToEnd?.({ animated: true });
+          // Honour the current arrow direction (which tracks scroll velocity)
+          // rather than position — matches the visual state the user sees.
+          if (directionRef.current === "down") scrollRef.current?.scrollToEnd?.({ animated: true });
           else scrollRef.current?.scrollTo?.({ y: 0, animated: true });
         }
       },
@@ -161,7 +200,7 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   // Cleanup on unmount.
   useEffect(() => () => stopLoop(), [stopLoop]);
 
-  const fab: ReactNode = direction ? (
+  const fab: ReactNode = visible ? (
     <View
       {...pan.panHandlers}
       style={{
@@ -171,7 +210,7 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
         width: 48,
         height: 48,
         borderRadius: 999,
-        backgroundColor: "#ffffff",
+        backgroundColor: COLORS.text, // ALWAYS black, ignores accent theme
         borderWidth: 2,
         borderColor: COLORS.border,
         alignItems: "center",
@@ -188,11 +227,9 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
         direction === "down" ? "Jump to bottom (drag to scroll)" : "Jump to top (drag to scroll)"
       }
     >
-      <Ionicons
-        name={direction === "down" ? "arrow-down" : "arrow-up"}
-        size={22}
-        color={accentColor}
-      />
+      <Animated.View style={{ transform: [{ rotate: iconSpin }] }}>
+        <Ionicons name="arrow-down" size={22} color="#ffffff" />
+      </Animated.View>
     </View>
   ) : null;
 
