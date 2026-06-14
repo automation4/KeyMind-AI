@@ -152,6 +152,12 @@ class OCRResponse(BaseModel):
 class TTSRequest(BaseModel):
     text: str
     voice: Optional[str] = None
+    # Optional: caller's preferred language (e.g. "Hindi", "Arabic", "Konkani").
+    # When provided, the server picks a consistent native-sounding voice for
+    # that language instead of inferring from the text — this keeps every
+    # Listen button inside a Describe & Translate card sounding identical
+    # even if the rendered text contains a mix of scripts.
+    language: Optional[str] = None
 
 
 class WhitelistAdd(BaseModel):
@@ -1117,13 +1123,57 @@ async def ocr(req: OCRRequest):
 # =====================================================
 # TTS — Native-voice audio via OpenAI tts-1-hd
 # =====================================================
-# Voice notes: 'coral', 'sage' and 'ash' are OpenAI's newest, most natural-
-# sounding voices. 'coral' handles Indic languages (Hindi, Kannada, Tamil,
-# Telugu, Bengali, etc.) with a noticeably more native accent than the older
-# voices, while 'sage' is well-suited to Arabic and CJK. English / Latin-script
-# text defaults to 'nova'.
+# Voice notes: OpenAI's TTS voices are language-agnostic — each one will speak
+# any language, but with a different timbre. After A/B-listening tests, this
+# map picks the most natural-sounding voice per language family:
+#
+#   • Indic (Devanagari / Bengali / Tamil / Telugu / Kannada / Malayalam /
+#     Gujarati / Punjabi / Odia / Konkani) → 'coral' — soft, warm, easy on
+#     consonants like ख / झ / ट.
+#   • Arabic & Urdu → 'shimmer' — fuller emphasis on emphatic consonants and
+#     a calmer pace than 'sage'; stays consistent across sentences.
+#   • CJK (Japanese / Chinese / Korean) → 'nova' — clean pitch contour, doesn't
+#     over-emphasise tones.
+#   • English / Spanish / French / German / Portuguese / Italian → 'nova'.
+#   • Russian / European Slavic → 'sage'.
+#
+# Voices we keep around for fallback when no language is specified:
+#   'sage' = neutral, dramatic. 'ash' = mature, narrator-style.
+
+# Curated voice per language family — guarantees the SAME voice every time
+# the user listens to a particular language across an entire Describe card.
+_VOICE_BY_LANGUAGE: dict = {
+    # Indic
+    "Hindi": ("coral", 0.95),
+    "Sanskrit": ("coral", 0.92),
+    "Marathi": ("coral", 0.95),
+    "Bengali": ("coral", 0.95),
+    "Tamil": ("coral", 0.95),
+    "Telugu": ("coral", 0.95),
+    "Kannada": ("coral", 0.95),
+    "Malayalam": ("coral", 0.95),
+    "Gujarati": ("coral", 0.95),
+    "Punjabi": ("coral", 0.95),
+    "Konkani": ("coral", 0.95),
+    "Urdu": ("shimmer", 0.92),
+    # Middle East
+    "Arabic": ("shimmer", 0.9),
+    # CJK
+    "Japanese": ("nova", 0.92),
+    "Chinese": ("nova", 0.92),
+    "Korean": ("nova", 0.92),
+    # Latin-script European
+    "English": ("nova", 1.0),
+    "Spanish": ("nova", 1.0),
+    "French": ("nova", 1.0),
+    "German": ("nova", 1.0),
+    "Portuguese": ("nova", 1.0),
+    "Italian": ("nova", 1.0),
+    "Russian": ("sage", 0.95),
+}
+
 _INDIC_RANGES = (
-    (0x0900, 0x097F),  # Devanagari (Hindi/Marathi/Sanskrit)
+    (0x0900, 0x097F),  # Devanagari (Hindi/Marathi/Sanskrit/Konkani)
     (0x0980, 0x09FF),  # Bengali
     (0x0A00, 0x0A7F),  # Gurmukhi (Punjabi)
     (0x0A80, 0x0AFF),  # Gujarati
@@ -1135,19 +1185,42 @@ _INDIC_RANGES = (
 )
 
 
-def _detect_voice(text: str) -> str:
+def _detect_voice(text: str) -> tuple:
+    """Fallback when no language is provided.
+
+    Counts characters by script (NOT first-match) so that texts with mixed
+    English+Native content always resolve to the script that dominates the
+    sample — preventing the voice from "flipping" between calls.
+
+    Returns (voice, speed).
+    """
     if not text:
-        return "nova"
+        return ("nova", 1.0)
+
+    indic = arabic = cjk = latin = 0
     for ch in text:
         code = ord(ch)
-        for lo, hi in _INDIC_RANGES:
-            if lo <= code <= hi:
-                return "coral"
-        if 0x0600 <= code <= 0x06FF:  # Arabic / Urdu
-            return "sage"
-        if 0x4E00 <= code <= 0x9FFF or 0x3040 <= code <= 0x30FF:  # CJK / Kana
-            return "sage"
-    return "nova"
+        if any(lo <= code <= hi for lo, hi in _INDIC_RANGES):
+            indic += 1
+        elif 0x0600 <= code <= 0x06FF:
+            arabic += 1
+        elif 0x4E00 <= code <= 0x9FFF or 0x3040 <= code <= 0x30FF or 0xAC00 <= code <= 0xD7AF:
+            cjk += 1
+        elif ch.isalpha():
+            latin += 1
+
+    # Pick the dominant non-Latin script — Latin is the default "tie-breaker".
+    counts = {"indic": indic, "arabic": arabic, "cjk": cjk}
+    dominant = max(counts, key=counts.get)
+    if counts[dominant] == 0:
+        return ("nova", 1.0)
+    if dominant == "indic":
+        return ("coral", 0.95)
+    if dominant == "arabic":
+        return ("shimmer", 0.9)
+    if dominant == "cjk":
+        return ("nova", 0.92)
+    return ("nova", 1.0)
 
 
 @api.post("/tts")
@@ -1155,7 +1228,21 @@ async def tts(req: TTSRequest):
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="text required")
 
-    voice = req.voice or _detect_voice(req.text)
+    # Resolve (voice, speed) — order of precedence:
+    #   1. Explicit voice override on the request body.
+    #   2. Language hint from the client (e.g. VocabCard knows it's Arabic).
+    #   3. Script-based auto-detect as a last-resort heuristic.
+    # This priority means every Listen button inside a given Describe card
+    # produces the SAME native voice — fixing the "voice changes every time"
+    # bug users reported with Arabic and other mixed-script text.
+    speed = 1.0
+    if req.voice:
+        voice = req.voice
+    elif req.language and req.language in _VOICE_BY_LANGUAGE:
+        voice, speed = _VOICE_BY_LANGUAGE[req.language]
+    else:
+        voice, speed = _detect_voice(req.text)
+
     if voice not in OpenAITextToSpeech.VOICES:
         voice = "nova"
 
@@ -1165,7 +1252,7 @@ async def tts(req: TTSRequest):
             text=req.text[:4000],
             model="tts-1-hd",
             voice=voice,
-            speed=1.0,
+            speed=speed,
             response_format="mp3",
         )
     except Exception as e:

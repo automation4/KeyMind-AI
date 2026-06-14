@@ -142,6 +142,7 @@ export const SimpleDescribeCard: React.FC<Props> = ({
             <ListenButton
               text={data.sentence_translated}
               small
+              language={language}
               testID="listen-sentence-translated"
             />
           </View>
@@ -196,6 +197,7 @@ export const SimpleDescribeCard: React.FC<Props> = ({
             <ListenButton
               text={data.meaning_translated}
               small
+              language={language}
               testID="listen-translated"
             />
           ) : null}

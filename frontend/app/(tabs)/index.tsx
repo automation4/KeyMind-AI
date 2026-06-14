@@ -388,6 +388,9 @@ export default function WriteScreen() {
                       suggestions: data.suggestions,
                       data: (data as any).data,
                     });
+                    // Switching languages re-runs the AI tool → counts as a tool use.
+                    // Tick the counter optimistically; reconcile via refreshUser().
+                    bumpUsage();
                     refreshUser();
                   } catch (e: any) {
                     if (e?.status === 429) {

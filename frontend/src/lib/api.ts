@@ -90,10 +90,10 @@ export const api = {
   ocr: (image_base64: string) =>
     request<{ text: string }>("/ocr", { method: "POST", body: { image_base64 } }),
 
-  tts: (text: string, voice?: string) =>
+  tts: (text: string, voice?: string, language?: string) =>
     request<{ audio_base64: string; voice: string; mime: string }>("/tts", {
       method: "POST",
-      body: { text, voice },
+      body: { text, voice, language },
     }),
 
   chat: (session_id: string, message: string) =>

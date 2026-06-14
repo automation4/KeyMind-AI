@@ -339,6 +339,10 @@ export default function ChatScreen() {
                             ),
                           );
                         }
+                        // Switching the vocab card language re-runs the AI tool →
+                        // counts as a tool use. Tick the counter immediately.
+                        bumpUsage();
+                        refreshUser();
                       } catch {
                       } finally {
                         setBusy(false);

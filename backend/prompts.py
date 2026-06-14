@@ -339,6 +339,7 @@ LANG_SCRIPT_RANGES: Dict[str, Any] = {
     "Hindi":     [(0x0900, 0x097F)],           # Devanagari
     "Sanskrit":  [(0x0900, 0x097F)],           # Devanagari
     "Marathi":   [(0x0900, 0x097F)],           # Devanagari
+    "Konkani":   [(0x0900, 0x097F)],           # Devanagari (default Konkani script)
     "Bengali":   [(0x0980, 0x09FF)],           # Bengali
     "Tamil":     [(0x0B80, 0x0BFF)],           # Tamil
     "Telugu":    [(0x0C00, 0x0C7F)],           # Telugu

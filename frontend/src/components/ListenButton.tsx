@@ -12,6 +12,14 @@ type Props = {
   small?: boolean;
   /** Icon-only compact circle button — use in tight rows (tenses, translated). */
   compact?: boolean;
+  /**
+   * Optional target language hint (e.g. "Arabic", "Hindi", "Konkani"). When
+   * provided, the backend picks a consistent native voice + pacing for that
+   * language — fixing the "voice changes every press" bug when the displayed
+   * text has mixed scripts (e.g. an Arabic translation rendered next to a
+   * Latin transliteration). Falls back to script-based auto-detect.
+   */
+  language?: string;
 };
 
 // Module-level player so only one audio plays at a time across the whole app.
@@ -30,7 +38,7 @@ async function stopAll() {
   try { Speech.stop(); } catch {}
 }
 
-export const ListenButton: React.FC<Props> = ({ text, testID, small, compact }) => {
+export const ListenButton: React.FC<Props> = ({ text, testID, small, compact, language }) => {
   const [state, setState] = React.useState<"idle" | "loading" | "playing">("idle");
 
   const onPress = async () => {
@@ -46,7 +54,7 @@ export const ListenButton: React.FC<Props> = ({ text, testID, small, compact }) 
     try {
       if (Platform.OS === "web") {
         // Web: use HTMLAudioElement with the MP3 from backend
-        const res = await api.tts(text);
+        const res = await api.tts(text, undefined, language);
         const audioUrl = `data:${res.mime};base64,${res.audio_base64}`;
         const audio = new (window as any).Audio(audioUrl);
         const onEnded = () => setState("idle");
@@ -63,7 +71,7 @@ export const ListenButton: React.FC<Props> = ({ text, testID, small, compact }) 
 
       // Native: fetch base64 audio → play via expo-audio
       try {
-        const res = await api.tts(text);
+        const res = await api.tts(text, undefined, language);
         await setAudioModeAsync({ playsInSilentMode: true });
         const player = createAudioPlayer({ uri: `data:${res.mime};base64,${res.audio_base64}` });
         activePlayer = player;

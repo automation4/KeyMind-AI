@@ -49,6 +49,7 @@ export type VocabData = {
 
 export const VOCAB_LANGUAGES = [
   "Hindi",
+  "Konkani",
   "Sanskrit",
   "Bengali",
   "Tamil",
@@ -75,6 +76,7 @@ export function romanLabel(lang: VocabLanguage): string {
     case "Hindi":
     case "Sanskrit":
     case "Marathi":
+    case "Konkani":
       return "HINGLISH";
     case "Tamil":
       return "TANGLISH";
@@ -289,7 +291,7 @@ export function VocabCard({
                 {data.meaning_translated || "—"}
               </Text>
               {data.meaning_translated ? (
-                <ListenButton text={data.meaning_translated} small compact testID="listen-translated" />
+                <ListenButton text={data.meaning_translated} small compact language={language} testID="listen-translated" />
               ) : null}
             </View>
             {data.meaning_transliterated && needsRoman(language) ? (
@@ -336,6 +338,7 @@ export function VocabCard({
                         text={row.translated}
                         small
                         compact
+                        language={language}
                         testID={`listen-tense-${t}-tr`}
                       />
                     </View>
@@ -423,6 +426,7 @@ export function VocabCard({
                       text={item.translated}
                       small
                       compact
+                      language={language}
                       testID={`listen-idiom-${idx}-tr`}
                     />
                   </View>
