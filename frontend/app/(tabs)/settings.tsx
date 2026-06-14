@@ -30,6 +30,7 @@ import { PatternBackground, PatternSvg, PATTERNS } from "@/src/components/Patter
 import { AccentColorPicker } from "@/src/components/AccentColorPicker";
 import { api } from "@/src/lib/api";
 import { useScrollFab } from "@/src/components/ScrollFab";
+import { contrastOn } from "@/src/lib/colorUtils";
 
 type AccentDef = { id: AccentName; color: string };
 
@@ -201,9 +202,10 @@ export default function SettingsScreen() {
             <Text
               style={[
                 styles.avatarText,
-                // Avatar bg follows the active accent — if accent is dark (ink)
-                // we need white text; otherwise black for contrast.
-                { color: accent === "ink" ? "#ffffff" : COLORS.text },
+                // Auto-pick black or white based on background luminance —
+                // covers ink, light pastels (mint/peach/sky/lilac/yellow)
+                // and any custom hex the user picked.
+                { color: contrastOn(accentColor) },
               ]}
             >
               {(user?.name || "U").trim()[0]?.toUpperCase() || "U"}
@@ -243,7 +245,7 @@ export default function SettingsScreen() {
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={styles.usageLabel}>DAILY AI USAGE</Text>
               <Text style={styles.usageCount}>
-                {user?.tool_uses_today ?? 0} / {user?.tool_uses_limit ?? 10}
+                {user?.tool_uses_today ?? 0} / {user?.tool_uses_limit ?? 5}
               </Text>
             </View>
             <View style={styles.usageBarBg}>

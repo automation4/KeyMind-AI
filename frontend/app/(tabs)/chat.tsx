@@ -30,6 +30,8 @@ import { MarkdownText, stripMarkdown } from "@/src/components/MarkdownText";
 import { VocabCard, VocabData, VocabLanguage } from "@/src/components/VocabCard";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { storage } from "@/src/utils/storage";
+import { ChatBubbleSkeleton } from "@/src/components/Skeleton";
+import { contrastOn } from "@/src/lib/colorUtils";
 
 const VOCAB_LANG_KEY = "keymind_vocab_lang";
 
@@ -84,7 +86,7 @@ const QUICK_PROMPTS = [
 export default function ChatScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { accentColor } = useTheme();
-  const { refreshUser } = useAuth();
+  const { refreshUser, bumpUsage } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const fab = useScrollFab(scrollRef, { bottomOffset: tabBarHeight + 96 });
   const [sessionId, setSessionId] = useState<string>("");
@@ -127,6 +129,9 @@ export default function ChatScreen() {
     setMessages((m) => [...m, { role: "user", content: message }]);
     scrollToBottom();
     setBusy(true);
+    if (Platform.OS !== "web") {
+      Haptics.selectionAsync().catch(() => {});
+    }
 
     // Auto-detect: single word / "describe X" → fetch the rich Describe card.
     const target = detectDescribeQuery(message);
@@ -145,6 +150,9 @@ export default function ChatScreen() {
             },
           ]);
           scrollToBottom();
+          // Optimistic counter bump — vocab card consumed one tool use.
+          bumpUsage();
+          refreshUser();
           setBusy(false);
           return;
         }
@@ -158,6 +166,9 @@ export default function ChatScreen() {
       const res = await api.chat(sessionId, message);
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
       scrollToBottom();
+      // Optimistic counter bump — ticks the daily usage pill immediately
+      // before refreshUser() finishes its round-trip.
+      bumpUsage();
       // Refresh the user's tool-usage counter — chat replies are billed too.
       refreshUser();
     } catch (e: any) {
@@ -352,12 +363,7 @@ export default function ChatScreen() {
             );
           })}
 
-          {busy && (
-            <View style={[styles.bubble, styles.aiBubble, { flexDirection: "row", gap: 8 }]}>
-              <ActivityIndicator size="small" color={COLORS.text} />
-              <Text style={styles.bubbleText}>Thinking…</Text>
-            </View>
-          )}
+          {busy && <ChatBubbleSkeleton />}
         </ScrollView>
 
         <View style={[styles.composer, { paddingBottom: 12 }]}>

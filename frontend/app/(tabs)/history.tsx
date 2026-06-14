@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,7 @@ import { TOOL_BY_ID } from "@/src/lib/tools";
 import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
 import { useScrollFab } from "@/src/components/ScrollFab";
+import { HistoryCardSkeleton } from "@/src/components/Skeleton";
 
 type Item = {
   id: string;
@@ -95,8 +96,10 @@ export default function HistoryScreen() {
       </View>
 
       {loading ? (
-        <View style={{ marginTop: 40, alignItems: "center" }}>
-          <ActivityIndicator color={COLORS.text} />
+        <View style={{ paddingHorizontal: 20, paddingTop: 12 }} testID="history-loading">
+          <HistoryCardSkeleton />
+          <HistoryCardSkeleton />
+          <HistoryCardSkeleton />
         </View>
       ) : (
         <ScrollView

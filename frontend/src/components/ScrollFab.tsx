@@ -80,43 +80,14 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   useEffect(() => { contentRef.current = contentHeight; }, [contentHeight]);
   useEffect(() => { layoutRef.current = layoutHeight; }, [layoutHeight]);
 
-  const lastScrollY = useRef(0);
-  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
-    const y = contentOffset.y;
-    const dy = y - lastScrollY.current;
-    lastScrollY.current = y;
-    setScrollY(y);
-    setLayoutHeight(layoutMeasurement.height);
-    setContentHeight(contentSize.height);
-
-    // Flip the arrow based on actual scroll *direction* — not just position.
-    if (Math.abs(dy) >= 1) {
-      const next: "up" | "down" = dy > 0 ? "down" : "up";
-      setDirection((prev) => (prev === next ? prev : next));
-      // Any real scroll movement re-arms the 5-second visibility window.
-      bumpVisibility();
-    }
-  }, [bumpVisibility]);
-
-  const onContentSizeChange = useCallback((_w: number, h: number) => {
-    setContentHeight(h);
-  }, []);
-
-  const onLayout = useCallback((e: LayoutChangeEvent) => {
-    setLayoutHeight(e.nativeEvent.layout.height);
-  }, []);
-
-  const maxScroll = Math.max(0, contentHeight - layoutHeight);
-  const scrollable = maxScroll > minScrollable;
-
   // Auto-show / auto-hide: the FAB is invisible until the user scrolls. After
-  // the most recent scroll event we keep it visible for 5 seconds (or as long
-  // as the user is actively dragging), then fade out so the UI stays clean.
+  // the most recent scroll event we keep it visible for 1.5 seconds (or as
+  // long as the user is actively dragging), then fade out so the UI stays
+  // clean. These must be declared BEFORE onScroll so the dependency array
+  // can reference `bumpVisibility` without hitting a TDZ error.
   const [shown, setShown] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const visible = scrollable && shown;
 
   const clearHideTimer = useCallback(() => {
     if (hideTimerRef.current) {
@@ -132,6 +103,37 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
     // long enough to act on, short enough to keep the UI clean.
     hideTimerRef.current = setTimeout(() => setShown(false), 1500);
   }, [clearHideTimer]);
+
+  const lastScrollY = useRef(0);
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+    const y = contentOffset.y;
+    const dy = y - lastScrollY.current;
+    lastScrollY.current = y;
+    setScrollY(y);
+    setLayoutHeight(layoutMeasurement.height);
+    setContentHeight(contentSize.height);
+
+    // Flip the arrow based on actual scroll *direction* — not just position.
+    if (Math.abs(dy) >= 1) {
+      const next: "up" | "down" = dy > 0 ? "down" : "up";
+      setDirection((prev) => (prev === next ? prev : next));
+      // Any real scroll movement re-arms the 1.5-second visibility window.
+      bumpVisibility();
+    }
+  }, [bumpVisibility]);
+
+  const onContentSizeChange = useCallback((_w: number, h: number) => {
+    setContentHeight(h);
+  }, []);
+
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    setLayoutHeight(e.nativeEvent.layout.height);
+  }, []);
+
+  const maxScroll = Math.max(0, contentHeight - layoutHeight);
+  const scrollable = maxScroll > minScrollable;
+  const visible = scrollable && shown;
 
   // Fade opacity in/out smoothly on visibility change.
   useEffect(() => {

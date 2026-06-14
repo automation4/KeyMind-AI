@@ -20,6 +20,10 @@ import { api } from "@/src/lib/api";
 import { useScrollFab } from "@/src/components/ScrollFab";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { PatternBackground } from "@/src/components/PatternBackground";
+import { storage } from "@/src/utils/storage";
+import { maybeAskForReview, recordApply } from "@/src/lib/rateApp";
+import { cacheResult, lookupResult } from "@/src/lib/offlineCache";
+import { contrastOn } from "@/src/lib/colorUtils";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useTheme } from "@/src/contexts/ThemeContext";
 import { AdBanner } from "@/src/components/AdBanner";
@@ -36,7 +40,7 @@ import {
   SummaryCard,
   ResultPayload,
 } from "@/src/components/write/ResultCard";
-import { storage } from "@/src/utils/storage";
+import { ResultCardSkeleton } from "@/src/components/Skeleton";
 
 const accentBg: Record<string, string> = {
   orange: COLORS.primary,
@@ -50,7 +54,7 @@ const accentBg: Record<string, string> = {
 const VOCAB_LANG_KEY = "keymind_vocab_lang";
 
 export default function WriteScreen() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, bumpUsage } = useAuth();
   const { accentColor } = useTheme();
   const tabBarHeight = useBottomTabBarHeight();
   const scrollRef = React.useRef<ScrollView>(null);
@@ -96,7 +100,7 @@ export default function WriteScreen() {
 
   const isPremium = !!(user?.is_premium || user?.is_admin);
   const usesToday = user?.tool_uses_today ?? 0;
-  const usesLimit = user?.tool_uses_limit ?? 10;
+  const usesLimit = user?.tool_uses_limit ?? 5;
   const usesLeft = isPremium ? Infinity : Math.max(0, usesLimit - usesToday);
   const limitReached = !isPremium && usesLeft <= 0;
 
@@ -146,14 +150,30 @@ export default function WriteScreen() {
     }
     try {
       const data = await api.tool(toolId, text, finalOptions);
-      setResult({
+      const payload = {
         tool: toolId,
         original: text,
         suggestions: data.suggestions,
         data: (data as any).data,
-      });
+      };
+      setResult(payload);
+      // Optimistic counter bump — ticks the "X / 5 uses today" pill instantly
+      // even before refreshUser() finishes its round-trip.
+      bumpUsage();
+      // Stash for offline replay (last 10 results).
+      cacheResult({ toolId, text, options: finalOptions, result: payload });
       refreshUser();
     } catch (e: any) {
+      // If we have a cached version of this exact request, serve it as a
+      // soft-fallback so the user gets value even when network/AI is flaky.
+      if (e?.status !== 429) {
+        const cached = await lookupResult(toolId, text);
+        if (cached) {
+          setResult(cached.result);
+          setError("Offline — showing your last saved result");
+          return;
+        }
+      }
       if (e?.status === 429) {
         setUpgradeMessage(
           e?.detail ||
@@ -193,6 +213,10 @@ export default function WriteScreen() {
         await api.saveHistory(activeTool, result?.original || "", suggestion);
       } catch {}
     }
+    // Track APPLY for the in-app rate prompt — after 5 successful applies
+    // (and a 60-day cooldown) we'll surface the OS review dialog.
+    recordApply();
+    maybeAskForReview();
   };
 
   const dismiss = () => setResult(null);
@@ -211,9 +235,15 @@ export default function WriteScreen() {
               HELLO, {(user?.name || "WRITER").toUpperCase()}
             </Text>
             {isPremium ? (
-              <View style={styles.premiumPill} testID="home-premium-badge">
-                <Ionicons name="diamond" size={10} color={COLORS.text} />
-                <Text style={styles.premiumPillText}>PREMIUM</Text>
+              <View
+                style={[
+                  styles.premiumPill,
+                  { backgroundColor: accentColor, borderColor: COLORS.border },
+                ]}
+                testID="home-premium-badge"
+              >
+                <Ionicons name="diamond" size={10} color={contrastOn(accentColor)} />
+                <Text style={[styles.premiumPillText, { color: contrastOn(accentColor) }]}>PREMIUM</Text>
               </View>
             ) : null}
           </View>
@@ -331,16 +361,7 @@ export default function WriteScreen() {
         </TouchableOpacity>
 
         {/* Result */}
-        {loading && !result && (
-          <View style={styles.thinkingCard}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <ActivityIndicator color={COLORS.text} />
-              <Text style={styles.thinking}>
-                Thinking in {wordCount > 30 ? "any language" : "your language"}…
-              </Text>
-            </View>
-          </View>
-        )}
+        {loading && !result && <ResultCardSkeleton />}
 
         {result && (
           <View testID="result-card">

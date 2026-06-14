@@ -98,6 +98,10 @@ type AuthState = {
   registerWithEmail: (email: string, password: string, name?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  /** Optimistically bump the daily usage counter for this user.
+   *  Use right after a /api/ai/tool or /api/ai/chat call succeeds so the
+   *  UI ticks instantly while refreshUser() resyncs with the server. */
+  bumpUsage: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -186,9 +190,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {}
   };
 
+  /** Optimistic local bump — used by Home + Chat right after a successful
+   *  AI call so the counter ticks before the network round-trip finishes.
+   *  refreshUser() is still called by the caller to reconcile with the server. */
+  const bumpUsage = () => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      if (prev.is_premium) return prev; // premium users aren't metered
+      const next = (prev.tool_uses_today || 0) + 1;
+      const limit = prev.tool_uses_limit ?? 5;
+      return {
+        ...prev,
+        tool_uses_today: next,
+        tool_uses_remaining: Math.max(0, limit - next),
+      };
+    });
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, deviceId, signInAsGuest, signInWithGoogleIdToken, signInAsAdmin, signInWithEmail, registerWithEmail, signOut, refreshUser }}
+      value={{ user, loading, deviceId, signInAsGuest, signInWithGoogleIdToken, signInAsAdmin, signInWithEmail, registerWithEmail, signOut, refreshUser, bumpUsage }}
     >
       {children}
     </AuthContext.Provider>

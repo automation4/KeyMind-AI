@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 
 import { COLORS, FONT, SHADOW } from "@/src/lib/theme";
 import { useTheme } from "@/src/contexts/ThemeContext";
+import { contrastOn } from "@/src/lib/colorUtils";
 import { useDictateLanguage } from "@/src/hooks/useDictateLanguage";
 import { useStreamingSpeechRecognition } from "@/src/hooks/useStreamingSpeechRecognition";
 
@@ -147,7 +148,7 @@ export function MicButton({
           <Ionicons
             name={listening ? "square" : "mic"}
             size={Math.round(size * 0.5)}
-            color="#ffffff"
+            color={listening ? "#ffffff" : contrastOn(accentColor)}
           />
         </TouchableOpacity>
       </Animated.View>
