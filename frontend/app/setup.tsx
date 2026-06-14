@@ -16,7 +16,7 @@ const LANGUAGES = [
 ];
 
 const ACCENTS: { id: AccentName; color: string; label: string }[] = [
-  { id: "orange", color: COLORS.primary, label: "Indigo" },
+  { id: "ink", color: COLORS.text, label: "Ink" },
   { id: "yellow", color: COLORS.secondary, label: "Butter" },
   { id: "mint", color: COLORS.mint, label: "Mint" },
   { id: "peach", color: COLORS.peach, label: "Peach" },
@@ -40,8 +40,9 @@ export default function Setup() {
     await storage.setItem("keymind_languages", JSON.stringify(selectedLangs));
     await storage.setItem("keymind_setup_done", true);
     // Persist on the user record (server-side) so returning users skip setup
-    // on a fresh install / cache wipe — except true guests which are device-bound.
-    if (user && !user.is_guest) {
+    // on a fresh install / cache wipe — applies to guests too since the
+    // server-side device fingerprint keeps them bound to the same guest doc.
+    if (user) {
       try {
         await api.setupComplete();
         await refreshUser();

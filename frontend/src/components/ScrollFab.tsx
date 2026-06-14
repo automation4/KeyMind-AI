@@ -128,9 +128,9 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   const bumpVisibility = useCallback(() => {
     setShown(true);
     clearHideTimer();
-    // Keep the FAB visible for 2 seconds after the most recent interaction —
+    // Keep the FAB visible for 1.5 seconds after the most recent interaction —
     // long enough to act on, short enough to keep the UI clean.
-    hideTimerRef.current = setTimeout(() => setShown(false), 2000);
+    hideTimerRef.current = setTimeout(() => setShown(false), 1500);
   }, [clearHideTimer]);
 
   // Fade opacity in/out smoothly on visibility change.
@@ -258,12 +258,7 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
           borderColor: COLORS.border,
           alignItems: "center",
           justifyContent: "center",
-          shadowColor: "#000",
-          shadowOpacity: dragging ? 0.3 : 0.18,
-          shadowOffset: { width: 0, height: 2 },
-          shadowRadius: 4,
-          elevation: dragging ? 8 : 5,
-          transform: [{ scale: dragging ? 1.1 : 1 }],
+          // No press effects — the FAB should only fade in/out, nothing else.
         }}
         testID={`scroll-fab-${direction}`}
         accessibilityLabel={

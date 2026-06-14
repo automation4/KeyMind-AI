@@ -242,7 +242,7 @@ export default function WriteScreen() {
           <View style={styles.usageChip} testID="write-usage-chip">
             <Ionicons name="flash-outline" size={14} color={COLORS.text} />
             <Text style={styles.usageChipText}>
-              {usesToday}/{usesLimit} AI uses today
+              {usesToday}/{usesLimit} uses today
             </Text>
             <Text style={styles.usageChipSub}>· Resets daily</Text>
           </View>

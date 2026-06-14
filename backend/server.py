@@ -50,7 +50,7 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or ""
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Free-tier daily AI usage limit (any tool, any combination)
-FREE_TOOL_DAILY_LIMIT = int(os.environ.get("FREE_TOOL_DAILY_LIMIT", "10"))
+FREE_TOOL_DAILY_LIMIT = int(os.environ.get("FREE_TOOL_DAILY_LIMIT", "5"))
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
