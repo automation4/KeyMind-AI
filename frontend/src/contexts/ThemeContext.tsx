@@ -73,7 +73,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const c = await storage.getItem<string>("keymind_custom_accent", "");
       const p = await storage.getItem<string>("keymind_pattern", "");
       if (m === "dark" || m === "light" || m === "matte") setModeState(m);
-      if (a && a in accentMap) setAccentState(a as AccentName);
+      if (a && a in accentMap) {
+        // Legacy users who picked "orange" (which was actually indigo) are
+        // silently migrated to "ink" — the new default — since the orange
+        // chip was removed from the picker.
+        const migrated: AccentName = a === "orange" ? "ink" : (a as AccentName);
+        setAccentState(migrated);
+        if (migrated !== a) {
+          await storage.setItem("keymind_accent", migrated);
+        }
+      }
       if (c && /^#[0-9a-fA-F]{6}$/.test(c)) setCustomAccentState(c);
       if (p && PATTERN_IDS.includes(p)) setPatternState(p as PatternName);
     })();

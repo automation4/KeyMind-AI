@@ -128,7 +128,9 @@ export function useScrollFab(scrollRef: ScrollRefLike, opts: Options = {}) {
   const bumpVisibility = useCallback(() => {
     setShown(true);
     clearHideTimer();
-    hideTimerRef.current = setTimeout(() => setShown(false), 5000);
+    // Keep the FAB visible for 2 seconds after the most recent interaction —
+    // long enough to act on, short enough to keep the UI clean.
+    hideTimerRef.current = setTimeout(() => setShown(false), 2000);
   }, [clearHideTimer]);
 
   // Fade opacity in/out smoothly on visibility change.

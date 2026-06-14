@@ -34,10 +34,11 @@ import { useScrollFab } from "@/src/components/ScrollFab";
 type AccentDef = { id: AccentName; color: string };
 
 // All accents are available to everyone. KeyMind has no public premium tier.
-// Black ("ink") is the default and appears first.
+// Black ("ink") is the default and appears first. The legacy "orange" (which
+// was actually indigo #4F46E5) was removed per UX feedback — the gradient
+// brand colors should not be a per-accent choice.
 const ACCENTS: AccentDef[] = [
   { id: "ink", color: COLORS.text },
-  { id: "orange", color: COLORS.primary },
   { id: "yellow", color: COLORS.secondary },
   { id: "mint", color: COLORS.mint },
   { id: "peach", color: COLORS.peach },
@@ -197,7 +198,14 @@ export default function SettingsScreen() {
         {/* Account card */}
         <View style={styles.card}>
           <View style={[styles.avatar, { backgroundColor: accentColor }]}>
-            <Text style={styles.avatarText}>
+            <Text
+              style={[
+                styles.avatarText,
+                // Avatar bg follows the active accent — if accent is dark (ink)
+                // we need white text; otherwise black for contrast.
+                { color: accent === "ink" ? "#ffffff" : COLORS.text },
+              ]}
+            >
               {(user?.name || "U").trim()[0]?.toUpperCase() || "U"}
             </Text>
           </View>

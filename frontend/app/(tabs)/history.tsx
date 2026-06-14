@@ -114,7 +114,7 @@ export default function HistoryScreen() {
               <Ionicons name="time-outline" size={48} color={COLORS.textMuted} />
               <Text style={styles.emptyTitle}>Nothing applied yet</Text>
               <Text style={styles.emptySub}>
-                Use any AI tool and tap APPLY — corrections will appear here.
+                Use any tool and tap APPLY — corrections will appear here.
               </Text>
             </View>
           ) : (
