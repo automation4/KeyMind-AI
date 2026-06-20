@@ -139,12 +139,7 @@ export const SimpleDescribeCard: React.FC<Props> = ({
               </Text>
               {langToggle}
             </View>
-            <ListenButton
-              text={data.sentence_translated}
-              small
-              language={language}
-              testID="listen-sentence-translated"
-            />
+            {/* Listen button removed for translated text — English source only. */}
           </View>
           {langChips}
           <Text
@@ -193,14 +188,7 @@ export const SimpleDescribeCard: React.FC<Props> = ({
             <Text style={styles.sectionLabel}>IN {language.toUpperCase()}</Text>
             {!hasSentenceSection ? langToggle : null}
           </View>
-          {!loading && data.meaning_translated ? (
-            <ListenButton
-              text={data.meaning_translated}
-              small
-              language={language}
-              testID="listen-translated"
-            />
-          ) : null}
+          {/* Listen button removed for translated content. */}
         </View>
 
         {!hasSentenceSection ? langChips : null}

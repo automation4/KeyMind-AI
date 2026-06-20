@@ -41,6 +41,25 @@ async function stopAll() {
 export const ListenButton: React.FC<Props> = ({ text, testID, small, compact, language }) => {
   const [state, setState] = React.useState<"idle" | "loading" | "playing">("idle");
 
+  // Per product decision: TTS is offered ONLY for English source text. The
+  // synthesized voice for many Indic / RTL scripts is unreliable, so we hide
+  // the button entirely for any non-Latin string OR any language hint that
+  // isn't "English"/"". This keeps the UI consistent across cards regardless
+  // of which call-site forgot to pass `language`.
+  const isEnglishOnly = React.useMemo(() => {
+    if (language && language !== "English") return false;
+    if (!text) return false;
+    // Allow letters/digits/punctuation/whitespace — reject any character
+    // outside basic Latin & Latin-1 supplement (covers café, naïve, etc.).
+    for (const ch of text) {
+      const code = ch.charCodeAt(0);
+      if (code > 0x024F) return false; // anything beyond Latin Extended-B → non-English
+    }
+    return true;
+  }, [text, language]);
+
+  if (!isEnglishOnly) return null;
+
   const onPress = async () => {
     if (!text?.trim()) return;
     if (state === "playing" || state === "loading") {

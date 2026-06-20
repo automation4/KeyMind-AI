@@ -297,6 +297,17 @@ def format_prompt(tool: str, options: Dict[str, Any]) -> str:
     except KeyError:
         prompt = template
 
+    # Inject a language-anchor block for the translation tools. Without this,
+    # Gemini frequently confuses Konkani with Hindi (returning "Iska matlab
+    # kya hai?" for Konkani) and confuses Marathi vocab with Hindi. The block
+    # gives the model an *unambiguous* native sample so it cannot fall back
+    # to the closest cousin language.
+    TRANSLATION_TOOLS = {"vocab", "vocab_full"}
+    if tool in TRANSLATION_TOOLS:
+        anchor = _language_anchor_block(safe["target_language"])
+        if anchor:
+            prompt = anchor + "\n\n" + prompt
+
     # Tools that TRANSFORM the user's text (do not translate to another language).
     # For these, the response MUST be in the EXACT same language + script as the
     # input — including Romanized forms (Hinglish, Tanglish, Tenglish, Manglish,
@@ -325,6 +336,186 @@ def format_prompt(tool: str, options: Dict[str, Any]) -> str:
         )
         prompt = lock + prompt
     return prompt
+
+
+# =====================================================
+# Language anchor blocks — keeps the model from confusing
+# closely-related languages (Konkani vs Hindi, Marathi vs Hindi,
+# Urdu vs Hindi, Sanskrit vs Hindi, etc.).
+# Each entry provides:
+#   • the language's native name + region
+#   • the REQUIRED script
+#   • a Roman-script ("English tone") sample so the model knows the
+#     exact phonology / vocabulary boundary
+#   • 2 known WRONG outputs (typically Hindi clones) that it MUST NOT produce
+# =====================================================
+_LANGUAGE_ANCHORS: Dict[str, Dict[str, str]] = {
+    "Konkani": {
+        "native_name": "कोंकणी / Konknni",
+        "region": "Goa, coastal Karnataka, coastal Maharashtra (Konkan)",
+        "script": "Devanagari (preferred) or Roman/Latin (Romi) — NEVER Hindi.",
+        "sample_native": "हांव कोंकणी उलयतां.",
+        "sample_roman":  "Hanv Konkani uloitam.",
+        "wrong_examples": "❌ NOT 'मैं कोंकणी बोलता हूँ' (Hindi)  ❌ NOT 'Main Konkani bolta hoon' (Hindi-Hinglish).",
+        "phrase_examples": (
+            "  • 'What does this mean?'  →  Native: 'हाजो अर्थ कितें?'  Roman: 'Hajo arth kitem?'\n"
+            "  • 'How are you?'          →  Native: 'तूं कसो आसा?'    Roman: 'Tum koso asa?'\n"
+            "  • 'Thank you'             →  Native: 'देव बरें करूं'    Roman: 'Dev borem korum'"
+        ),
+    },
+    "Marathi": {
+        "native_name": "मराठी",
+        "region": "Maharashtra",
+        "script": "Devanagari — same script as Hindi but DIFFERENT vocabulary and grammar.",
+        "sample_native": "तू कसा आहेस?",
+        "sample_roman":  "Tu kasa aahes?",
+        "wrong_examples": "❌ NOT 'तुम कैसे हो?' (Hindi)  ❌ NOT 'Tum kaise ho?' (Hinglish).",
+        "phrase_examples": (
+            "  • 'What does this mean?'  →  Native: 'याचा अर्थ काय आहे?'  Roman: 'Yacha arth kay aahe?'\n"
+            "  • 'How are you?'          →  Native: 'तू कसा आहेस?'         Roman: 'Tu kasa aahes?'"
+        ),
+    },
+    "Sanskrit": {
+        "native_name": "संस्कृतम्",
+        "region": "Classical Indo-Aryan",
+        "script": "Devanagari with classical sandhi / vibhakti — NOT modern Hindi.",
+        "sample_native": "एतस्य अर्थः कः?",
+        "sample_roman":  "Etasya arthah kah?",
+        "wrong_examples": "❌ NOT 'इसका मतलब क्या है?' (Hindi).",
+        "phrase_examples": (
+            "  • 'What does this mean?'  →  Native: 'एतस्य अर्थः कः?'     Roman: 'Etasya arthah kah?'\n"
+            "  • 'How are you?'          →  Native: 'भवान् कथम् अस्ति?'    Roman: 'Bhavān katham asti?'"
+        ),
+    },
+    "Urdu": {
+        "native_name": "اُردُو",
+        "region": "Pakistan / North India",
+        "script": "Perso-Arabic Nastaliq (RTL) — Persian/Arabic loanwords preferred over Sanskrit loans.",
+        "sample_native": "آپ کیسے ہیں؟",
+        "sample_roman":  "Aap kaise hain?",
+        "wrong_examples": "❌ NEVER write Urdu in Devanagari script.",
+        "phrase_examples": (
+            "  • 'What does this mean?'  →  Native: 'اس کا کیا مطلب ہے؟'   Roman: 'Iska kya matlab hai?'\n"
+            "  • 'How are you?'          →  Native: 'آپ کیسے ہیں؟'         Roman: 'Aap kaise hain?'"
+        ),
+    },
+    "Tamil": {
+        "native_name": "தமிழ்", "region": "Tamil Nadu, Sri Lanka, Singapore",
+        "script": "Tamil script — NEVER Devanagari or Sanskrit.",
+        "sample_native": "இதன் அர்த்தம் என்ன?",
+        "sample_roman":  "Idhan artham enna?",
+        "wrong_examples": "❌ NOT Hindi.  ❌ NEVER use Devanagari letters.",
+        "phrase_examples": "",
+    },
+    "Telugu": {
+        "native_name": "తెలుగు", "region": "Andhra Pradesh, Telangana",
+        "script": "Telugu script — NEVER Devanagari, NEVER Kannada.",
+        "sample_native": "దీని అర్థం ఏమిటి?",
+        "sample_roman":  "Dheeni artham emiti?",
+        "wrong_examples": "",
+        "phrase_examples": "",
+    },
+    "Kannada": {
+        "native_name": "ಕನ್ನಡ", "region": "Karnataka",
+        "script": "Kannada script — looks similar to Telugu but is DIFFERENT. NEVER Devanagari.",
+        "sample_native": "ಇದರ ಅರ್ಥ ಏನು?",
+        "sample_roman":  "Idara artha enu?",
+        "wrong_examples": "",
+        "phrase_examples": "",
+    },
+    "Malayalam": {
+        "native_name": "മലയാളം", "region": "Kerala",
+        "script": "Malayalam script — distinct round shapes. NEVER Devanagari or Tamil.",
+        "sample_native": "ഇതിന്റെ അർത്ഥം എന്താണ്?",
+        "sample_roman":  "Ithinte artham enthanu?",
+        "wrong_examples": "",
+        "phrase_examples": "",
+    },
+    "Bengali": {
+        "native_name": "বাংলা", "region": "West Bengal, Bangladesh",
+        "script": "Bengali script — NEVER Devanagari.",
+        "sample_native": "এর মানে কী?",
+        "sample_roman":  "Er mane ki?",
+        "wrong_examples": "",
+        "phrase_examples": "",
+    },
+    "Gujarati": {
+        "native_name": "ગુજરાતી", "region": "Gujarat",
+        "script": "Gujarati script (no header bar) — NEVER Devanagari.",
+        "sample_native": "આનો અર્થ શું છે?",
+        "sample_roman":  "Aano arth shu chhe?",
+        "wrong_examples": "",
+        "phrase_examples": "",
+    },
+    "Punjabi": {
+        "native_name": "ਪੰਜਾਬੀ", "region": "Punjab",
+        "script": "Gurmukhi — NEVER Devanagari.",
+        "sample_native": "ਇਸਦਾ ਕੀ ਮਤਲਬ ਹੈ?",
+        "sample_roman":  "Isda ki matlab hai?",
+        "wrong_examples": "",
+        "phrase_examples": "",
+    },
+    "Arabic": {
+        "native_name": "العربية", "region": "Middle East / North Africa",
+        "script": "Arabic script (RTL).",
+        "sample_native": "ماذا يعني هذا؟",
+        "sample_roman":  "Maadha yaani haadha?",
+        "wrong_examples": "",
+        "phrase_examples": "",
+    },
+    "Japanese": {
+        "native_name": "日本語", "region": "Japan",
+        "script": "Mix of Hiragana, Katakana and Kanji. Use natural Japanese, not Chinese.",
+        "sample_native": "これはどういう意味ですか？",
+        "sample_roman":  "Kore wa dō iu imi desu ka?",
+        "wrong_examples": "❌ NOT Chinese Hanzi only.",
+        "phrase_examples": "",
+    },
+    "Chinese": {
+        "native_name": "中文 (Simplified)", "region": "Mainland China / Singapore",
+        "script": "Simplified Hanzi — not Traditional unless asked.",
+        "sample_native": "这是什么意思？",
+        "sample_roman":  "Zhè shì shénme yìsi?",
+        "wrong_examples": "",
+        "phrase_examples": "",
+    },
+}
+
+
+def _language_anchor_block(target_language: str) -> str:
+    """Build a strong language-disambiguation prefix for the vocab tools.
+
+    Returns "" for English / Latin-script languages — the model rarely
+    confuses Spanish/French/etc., and the cost of a long prompt isn't worth it.
+    """
+    if not target_language or target_language == "English":
+        return ""
+    a = _LANGUAGE_ANCHORS.get(target_language)
+    if not a:
+        return ""
+    parts = [
+        "================ TARGET-LANGUAGE ANCHOR (READ FIRST) ================",
+        f"Target language: **{target_language}** ({a['native_name']}) — spoken in {a['region']}.",
+        f"REQUIRED SCRIPT: {a['script']}",
+        f"Native sample sentence: \"{a['sample_native']}\"",
+        f"Romanised sample:       \"{a['sample_roman']}\"",
+    ]
+    if a.get("wrong_examples"):
+        parts.append(a["wrong_examples"])
+    if a.get("phrase_examples"):
+        parts.append("Calibration phrases (mimic this style):")
+        parts.append(a["phrase_examples"])
+    parts.append(
+        f"\nWhen you produce `meaning_translated`, `sentence_translated`, "
+        f"tense translations and idiom translations, they MUST be in genuine "
+        f"{target_language} — NOT in Hindi, NOT in a nearby cousin language, "
+        f"NOT a transliteration of the English phrase. If you cannot find a "
+        f"natural {target_language} equivalent, use the closest authentic "
+        f"{target_language} phrasing (you may borrow English/Sanskrit/"
+        f"Persian loanwords ONLY if a native speaker would in real life)."
+    )
+    parts.append("===================================================================")
+    return "\n".join(parts)
 
 
 # =====================================================

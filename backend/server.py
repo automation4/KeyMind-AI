@@ -19,7 +19,7 @@ from passlib.context import CryptContext
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 from emergentintegrations.llm.openai.text_to_speech import OpenAITextToSpeech
-from emergentintegrations.llm.openai.speech_to_text import OpenAISpeechToText
+# STT (speech-to-text) import removed — mic/dictation feature was deprecated.
 import base64
 import json
 import re
@@ -1269,73 +1269,6 @@ async def tts(req: TTSRequest):
 
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
     return {"audio_base64": audio_b64, "voice": voice, "mime": "audio/mpeg"}
-
-
-@api.post("/transcribe")
-async def transcribe(
-    audio: UploadFile = File(...),
-    language: Optional[str] = Form(None),
-    authorization: Optional[str] = Header(None),
-):
-    """Speech-to-text via OpenAI Whisper-1 (through Emergent LLM Key).
-    Accepts m4a/mp3/wav/webm/mp4. Returns {text: "..."}.
-    Does NOT count toward the daily AI-tool limit — voice typing is an input aid.
-    """
-    # Optional auth — guests can use voice input too. Just makes sure caller is valid if header sent.
-    if authorization:
-        try:
-            await get_current_user(authorization)
-        except HTTPException:
-            pass  # don't block transcription if session expired
-
-    filename = audio.filename or "voice.m4a"
-    ext = Path(filename).suffix.lstrip(".").lower()
-    if ext not in {"m4a", "mp3", "mp4", "mpeg", "mpga", "wav", "webm"}:
-        # Default to m4a since expo-audio records m4a/aac on iOS, m4a/mp4 on Android.
-        ext = "m4a"
-
-    audio_bytes = await audio.read()
-    if not audio_bytes:
-        raise HTTPException(status_code=400, detail="Empty audio file")
-    if len(audio_bytes) > 25 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Audio file too large (max 25MB)")
-
-    tmp_path: Optional[str] = None
-    try:
-        with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
-            tmp.write(audio_bytes)
-            tmp_path = tmp.name
-
-        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
-        # Whisper auto-detects language when `language` is None.
-        # litellm expects `file` to be bytes / IOBase / PathLike — NOT a plain str,
-        # so we open the temp file as a binary handle.
-        with open(tmp_path, "rb") as fh:
-            result = await stt.transcribe(
-                file=fh,
-                model="whisper-1",
-                response_format="json",
-                language=language or None,
-                temperature=0.0,
-            )
-        # `result` is a dict-like / LiteLLM TranscriptionResponse. Pull `.text`.
-        text = ""
-        if isinstance(result, dict):
-            text = result.get("text") or ""
-        else:
-            text = getattr(result, "text", "") or str(result)
-        return {"text": text.strip()}
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        logger.exception("Transcription failed")
-        raise HTTPException(status_code=502, detail=f"Transcription error: {e}")
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
 
 
 # =====================================================

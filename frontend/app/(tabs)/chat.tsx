@@ -24,14 +24,12 @@ import { api } from "@/src/lib/api";
 import { PatternBackground } from "@/src/components/PatternBackground";
 import { ListenButton } from "@/src/components/ListenButton";
 import { AdBanner } from "@/src/components/AdBanner";
-import { MicButton } from "@/src/components/MicButton";
-import { DictateLanguagePicker } from "@/src/components/DictateLanguagePicker";
+import { ChatBubbleSkeleton } from "@/src/components/Skeleton";
+import { contrastOn } from "@/src/lib/colorUtils";
 import { MarkdownText, stripMarkdown } from "@/src/components/MarkdownText";
 import { VocabCard, VocabData, VocabLanguage } from "@/src/components/VocabCard";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { storage } from "@/src/utils/storage";
-import { ChatBubbleSkeleton } from "@/src/components/Skeleton";
-import { contrastOn } from "@/src/lib/colorUtils";
 
 const VOCAB_LANG_KEY = "keymind_vocab_lang";
 
@@ -94,8 +92,6 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [vocabLang, setVocabLang] = useState<VocabLanguage>("Hindi");
-  const [chatInterim, setChatInterim] = useState("");
-  const [chatListening, setChatListening] = useState(false);
   // Track whether we should auto-scroll to bottom when ScrollView content size changes.
   // Set to true ONLY right after a new message is added — prevents listen-button taps
   // (or any other in-card state change that resizes content) from yanking the scroll.
@@ -371,43 +367,15 @@ export default function ChatScreen() {
         </ScrollView>
 
         <View style={[styles.composer, { paddingBottom: 12 }]}>
-          <View style={styles.composerLangRow}>
-            <DictateLanguagePicker compact />
-          </View>
           <View style={styles.composerRow}>
             <TextInput
-              value={chatInterim ? `${input}${input ? " " : ""}${chatInterim}` : input}
-              onChangeText={(v) => {
-                if (chatListening) return; // ignore manual edits while mic is live
-                setInput(v);
-              }}
-              editable={!chatListening}
+              value={input}
+              onChangeText={setInput}
               placeholder="Ask about grammar, words, languages…"
               placeholderTextColor={COLORS.textMuted}
               style={styles.composerInput}
               multiline
               testID="chat-input"
-            />
-            <MicButton
-              size={40}
-              onFinal={(spoken) => {
-                // IMPORTANT: clear the interim immediately so it doesn't
-                // briefly duplicate with the new committed text.
-                setChatInterim("");
-                setInput((prev) => {
-                  const t = spoken.trim();
-                  if (!t) return prev;
-                  if (!prev) return t;
-                  const sep = /[.!?…\n]\s*$/.test(prev)
-                    ? " "
-                    : prev.endsWith(" ")
-                    ? ""
-                    : " ";
-                  return prev + sep + t;
-                });
-              }}
-              onInterim={setChatInterim}
-              onListeningChange={setChatListening}
             />
             <TouchableOpacity
               style={[

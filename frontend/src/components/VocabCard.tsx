@@ -290,9 +290,9 @@ export function VocabCard({
               <Text style={styles.meaningNative} selectable testID="vocab-translated">
                 {data.meaning_translated || "—"}
               </Text>
-              {data.meaning_translated ? (
-                <ListenButton text={data.meaning_translated} small compact language={language} testID="listen-translated" />
-              ) : null}
+              {/* Listen button removed for translated/local-language text —
+                  natural-voice TTS for many Indic / RTL scripts is shaky, so
+                  we keep the speaker only on English source content. */}
             </View>
             {data.meaning_transliterated && needsRoman(language) ? (
               <View style={styles.translitWrap}>
@@ -334,13 +334,7 @@ export function VocabCard({
                       <Text style={styles.tenseNative} selectable>
                         {row.translated}
                       </Text>
-                      <ListenButton
-                        text={row.translated}
-                        small
-                        compact
-                        language={language}
-                        testID={`listen-tense-${t}-tr`}
-                      />
+                      {/* Listen button removed for translated content. */}
                     </View>
                   ) : null}
                   {row.transliterated && needsRoman(language) && !loading ? (
@@ -422,13 +416,7 @@ export function VocabCard({
                     <Text style={styles.idiomNative} selectable>
                       {item.translated}
                     </Text>
-                    <ListenButton
-                      text={item.translated}
-                      small
-                      compact
-                      language={language}
-                      testID={`listen-idiom-${idx}-tr`}
-                    />
+                    {/* Listen removed on translated idiom — English only. */}
                   </View>
                 ) : null}
                 {item.transliterated && needsRoman(language) && !loading ? (
