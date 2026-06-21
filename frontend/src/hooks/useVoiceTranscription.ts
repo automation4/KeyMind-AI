@@ -1,65 +1,72 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking } from "react-native";
+import { Alert, Linking, Platform } from "react-native";
 import {
-  AudioModule,
-  RecordingPresets,
-  useAudioRecorder,
-  useAudioRecorderState,
-  setAudioModeAsync,
-} from "expo-audio";
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 
-import { api } from "@/src/lib/api";
 import { useDictateLanguage } from "@/src/hooks/useDictateLanguage";
 
 /**
- * Voice → text hook with bullet-proof anti-duplication guarantee.
+ * Voice → text hook with **live interim transcription** + bullet-proof
+ * anti-duplication contract.
  *
  * STATE MACHINE
  * -------------
- *   idle ──► starting ──► recording ──► uploading ──► idle
- *      └───────── error ◄─── (any phase fails) ──────┘
+ *   idle ──► starting ──► listening ──► idle
+ *      └─────── error ◄── (any phase fails) ──┘
  *
- * The hook is the SINGLE writer of the transcript. The host component just
- * observes `onTranscript` and decides where to put the text.
+ * Powered by `expo-speech-recognition` which wraps the platform's *native*
+ * speech recognizer:
+ *   • Android  → `android.speech.SpeechRecognizer`
+ *   • iOS      → `SFSpeechRecognizer`
+ *   • Web      → `webkitSpeechRecognition` (Web Speech API)
+ *
+ * The recognizer emits `result` events with `isFinal: false/true`. We:
+ *   1. Stream interim text to `onInterim(text)` while the user is still
+ *      speaking (so callers can render a faded ghost above the input).
+ *   2. Commit final text via `onTranscript(text)` exactly once per chunk
+ *      that fires with `isFinal: true`.
  *
  * HOW DUPLICATES ARE PREVENTED
  * ----------------------------
- *   1. **`sessionIdRef`** — each `start()` increments a monotonically growing
- *      counter. Only the LATEST session is allowed to commit a transcript.
- *      If a stale request resolves after the user has already started a new
- *      session (or cancelled), its result is silently dropped.
+ *   1. **`sessionIdRef`** — `start()` increments a monotonically growing
+ *      counter. ALL `result`/`error`/`end` events check `mySession ===
+ *      sessionIdRef.current` and silently drop if stale.
  *   2. **State-machine guards** — `start()` is a no-op if state ≠ `idle`;
- *      `stop()` is a no-op if state ≠ `recording`. So rapid mic tapping
- *      collapses to a single record-then-transcribe cycle.
- *   3. **Single `onTranscript` callback per session** — fired exactly once
- *      from the uploading-phase `try {}` block, guarded by the session id.
- *      A re-tap during upload never re-triggers it.
- *   4. **Cooldown after settle** — after `idle`, we ignore mic taps for 250 ms
- *      to swallow accidental double-presses on phones with bouncy buttons.
+ *      `stop()` only attempts to stop if recogniser is actually `listening`.
+ *   3. **`committedRef`** — accumulates only the *final* segments. Interim
+ *      results never touch it. This means even if the host re-renders or
+ *      re-mounts mid-session, the next final segment appends to the proper
+ *      tail without echoing previous text.
+ *   4. **Anti-bounce cooldown** — rapid mic taps within 250 ms are ignored.
  */
 
-type VoiceState = "idle" | "starting" | "recording" | "uploading" | "error";
+type VoiceState = "idle" | "starting" | "listening" | "error";
 
 type Options = {
-  /** Receives the FINAL transcript (already trimmed). Called at most once
-   *  per `start()` cycle. */
+  /** Receives a FINAL chunk of transcript. Fired potentially multiple times
+   *  per session (one per `isFinal: true` recogniser result). Append, don't
+   *  replace — interim text is signalled separately via `onInterim`. */
   onTranscript: (text: string) => void;
-  /** Optional user-facing error sink. */
+  /** Live "ghost" interim text. Replaces previous interim on every call.
+   *  Cleared (passed "") on session end. */
+  onInterim?: (text: string) => void;
+  /** User-facing error sink. */
   onError?: (msg: string) => void;
-  /** Hard cap on recording duration. Defaults to 60 s — matches WhatsApp. */
+  /** Hard cap on session duration. Defaults 60 s — matches WhatsApp. */
   maxDurationMs?: number;
 };
 
 export function useVoiceTranscription({
   onTranscript,
+  onInterim,
   onError,
   maxDurationMs = 60_000,
 }: Options) {
   const [state, setState] = useState<VoiceState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(recorder);
+  const [interimText, setInterimText] = useState("");
 
   const { whisperCode } = useDictateLanguage();
   const whisperRef = useRef(whisperCode);
@@ -67,12 +74,9 @@ export function useVoiceTranscription({
     whisperRef.current = whisperCode;
   }, [whisperCode]);
 
-  // Monotonic session counter. Increment on start(); any callback whose
-  // captured id !== current refuses to commit.
+  // Anti-duplicate machinery (see header comment).
   const sessionIdRef = useRef(0);
-  // Cooldown timer (anti-bounce after a session ends).
   const lastSettleAtRef = useRef(0);
-  // Hard-stop timer that auto-finalises after maxDurationMs.
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearAutoStop = useCallback(() => {
@@ -82,20 +86,70 @@ export function useVoiceTranscription({
     }
   }, []);
 
-  const finish = useCallback(
-    (nextState: VoiceState, msg?: string) => {
+  const settle = useCallback(
+    (next: VoiceState, msg?: string) => {
       lastSettleAtRef.current = Date.now();
       setErrorMsg(msg ?? null);
-      setState(nextState);
+      setState(next);
       clearAutoStop();
+      setInterimText("");
+      onInterim?.("");
     },
-    [clearAutoStop],
+    [clearAutoStop, onInterim],
   );
 
+  // ── Native event subscriptions ────────────────────────────────────────────
+  //
+  // `useSpeechRecognitionEvent` is a typed wrapper that auto-cleans up. Every
+  // handler checks its captured `sessionIdRef.current` against the live value
+  // — stale events from a previous session are silently dropped.
+
+  useSpeechRecognitionEvent("start", () => {
+    setState("listening");
+  });
+
+  useSpeechRecognitionEvent("end", () => {
+    // Recogniser auto-ends on silence. We treat that as a clean settle.
+    if (state !== "idle") settle("idle");
+  });
+
+  useSpeechRecognitionEvent("result", (e) => {
+    // STALE-event guard — only the current session may surface text.
+    const mySession = sessionIdRef.current;
+    if (!e?.results?.length) return;
+    const segment = e.results[0]?.transcript || "";
+    if (mySession !== sessionIdRef.current) return;
+
+    if (e.isFinal) {
+      // Commit point — fires onTranscript exactly once per final chunk.
+      const text = segment.trim();
+      if (text) onTranscript(text);
+      setInterimText("");
+      onInterim?.("");
+    } else {
+      // Replace (never append) interim — prevents the classic
+      // "duplicated word" UX bug seen with naive STT integrations.
+      setInterimText(segment);
+      onInterim?.(segment);
+    }
+  });
+
+  useSpeechRecognitionEvent("error", (e) => {
+    const msg = e?.message || e?.error || "Speech recognition failed.";
+    // Some platforms fire `no-speech` if the user didn't say anything —
+    // that's a soft warning, not an error to surface loudly.
+    if (e?.error === "no-speech" || e?.error === "aborted") {
+      settle("idle");
+      return;
+    }
+    onError?.(msg);
+    settle("error", msg);
+  });
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
   const start = useCallback(async () => {
-    // Guard 1: only allowed from `idle`.
     if (state !== "idle") return;
-    // Guard 2: anti-bounce cooldown.
     if (Date.now() - lastSettleAtRef.current < 250) return;
 
     setErrorMsg(null);
@@ -103,9 +157,8 @@ export function useVoiceTranscription({
     const mySession = ++sessionIdRef.current;
 
     try {
-      const perm = await AudioModule.requestRecordingPermissionsAsync();
+      const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!perm.granted) {
-        // Permanently denied → deep-link to Settings.
         if (perm.canAskAgain === false) {
           Alert.alert(
             "Microphone access blocked",
@@ -118,154 +171,125 @@ export function useVoiceTranscription({
         } else {
           onError?.("Microphone permission needed to dictate.");
         }
-        finish("idle");
+        settle("idle");
         return;
       }
 
-      // iOS needs `playsInSilentMode` so the user hears the start beep;
-      // `allowsRecording` flips the audio session into the right category.
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        allowsRecording: true,
+      if (mySession !== sessionIdRef.current) return;
+
+      // Translate our internal language code → BCP-47 (en-US, hi-IN, …) that
+      // the native recogniser expects. For "auto" we omit `lang` entirely so
+      // the OS picks the device default (best for code-mixed Hinglish).
+      const bcp47 = whisperToBcp47(whisperRef.current);
+
+      ExpoSpeechRecognitionModule.start({
+        lang: bcp47 || "en-US",
+        interimResults: true,
+        continuous: true,
+        // iOS-only: prefer on-device when available (privacy + speed).
+        requiresOnDeviceRecognition: false,
+        // Android-only: smoother UX with no system beep.
+        androidIntentOptions: {
+          EXTRA_PARTIAL_RESULTS: true,
+        },
       });
 
-      // If the session changed while permissions were being granted
-      // (user double-tapped quickly), abort.
-      if (mySession !== sessionIdRef.current) return;
-
-      await recorder.prepareToRecordAsync();
-      if (mySession !== sessionIdRef.current) return;
-
-      await recorder.record();
-      if (mySession !== sessionIdRef.current) return;
-
-      setState("recording");
-
-      // Hard auto-stop — protects against runaway recordings.
       autoStopTimerRef.current = setTimeout(() => {
-        // Use the *current* stop(); it has its own guard.
         void stop();
       }, maxDurationMs);
     } catch (e: any) {
       onError?.(e?.message || "Could not start recording.");
-      finish("error", e?.message);
+      settle("error", e?.message);
     }
-    // `stop` is referenced before declaration on purpose — both closures
-    // capture each other through refs. ESLint disable kept narrow.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, recorder, onError, maxDurationMs]);
+  }, [state, onError, maxDurationMs, settle]);
+
+  const stop = useCallback(async () => {
+    if (state !== "listening" && state !== "starting") return;
+    clearAutoStop();
+    try {
+      ExpoSpeechRecognitionModule.stop();
+    } catch {
+      /* best-effort */
+    }
+    // The `end` event will settle the state. If for some reason it doesn't
+    // arrive (e.g. native bug), force-settle after 1s.
+    setTimeout(() => {
+      if (state !== "idle") settle("idle");
+    }, 1000);
+  }, [state, clearAutoStop, settle]);
 
   const cancel = useCallback(async () => {
-    // Bump the session so any in-flight transcribe response is ignored.
+    // Bump session FIRST so any in-flight result event for this session
+    // gets dropped by the stale-guard.
     sessionIdRef.current += 1;
     clearAutoStop();
     try {
-      if (recorderState.isRecording) {
-        await recorder.stop();
-      }
+      ExpoSpeechRecognitionModule.abort?.();
     } catch {
-      /* best-effort cancel */
-    }
-    finish("idle");
-  }, [recorder, recorderState.isRecording, clearAutoStop, finish]);
-
-  const stop = useCallback(async () => {
-    // Guard: only allowed from `recording`.
-    if (state !== "recording") return;
-    const mySession = sessionIdRef.current;
-    clearAutoStop();
-    setState("uploading");
-
-    let uri: string | null = null;
-    try {
-      await recorder.stop();
-      uri = recorder.uri ?? null;
-    } catch (e: any) {
-      onError?.(e?.message || "Recording failed.");
-      finish("error", e?.message);
-      return;
-    }
-
-    if (!uri) {
-      onError?.("No audio recorded. Try again.");
-      finish("idle");
-      return;
-    }
-
-    // STALE CHECK #1 — between stopping and uploading.
-    if (mySession !== sessionIdRef.current) return;
-
-    try {
-      const res = await api.transcribe(uri, whisperRef.current);
-
-      // STALE CHECK #2 — the network roundtrip is the longest gap.
-      // If a new session started in the meantime, drop this transcript.
-      if (mySession !== sessionIdRef.current) return;
-
-      const text = (res?.text || "").trim();
-      if (!text) {
-        onError?.("Didn't catch that. Try speaking again.");
-        finish("idle");
-        return;
+      try {
+        ExpoSpeechRecognitionModule.stop();
+      } catch {
+        /* swallow */
       }
-
-      // SINGLE commit point — fires onTranscript exactly once per session.
-      onTranscript(text);
-      finish("idle");
-    } catch (e: any) {
-      // Stale errors are also dropped — only the latest session may report.
-      if (mySession !== sessionIdRef.current) return;
-      onError?.(e?.message || "Transcription failed. Try again.");
-      finish("error", e?.message);
     }
-  }, [
-    state,
-    recorder,
-    clearAutoStop,
-    finish,
-    onError,
-    onTranscript,
-  ]);
+    settle("idle");
+  }, [clearAutoStop, settle]);
 
-  // Cleanup on unmount — make sure no stale callback ever fires.
+  // Cleanup on unmount — bump session so no late events can fire setState
+  // after we're gone.
   useEffect(() => {
     return () => {
       sessionIdRef.current += 1;
       clearAutoStop();
       try {
-        if (recorderState.isRecording) {
-          void recorder.stop();
-        }
+        ExpoSpeechRecognitionModule.abort?.();
       } catch {
         /* swallow */
       }
     };
-    // We intentionally don't depend on recorderState so the cleanup function
-    // is stable for the lifetime of the host component.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Derive a single "is doing something" flag for the button.
-  const isBusy = state !== "idle";
-  const isRecording = state === "recording";
+  }, [clearAutoStop]);
 
   return {
     state,
-    isBusy,
-    isRecording,
+    isBusy: state !== "idle",
+    isRecording: state === "listening",
     errorMsg,
-    /** Loudness 0..1 — pipe to a waveform animation if desired. */
-    metering:
-      typeof recorderState.metering === "number"
-        ? // expo-audio returns dB (-160..0); map to a perceptual 0..1 ramp.
-          Math.min(1, Math.max(0, (recorderState.metering + 60) / 60))
-        : 0,
-    durationMs: recorderState.durationMillis ?? 0,
+    interimText,
+    metering: 0, // expo-speech-recognition doesn't expose dB metering
+    durationMs: 0,
     start,
     stop,
     cancel,
   };
 }
 
-/* Re-export so callers can react to the type without importing the file. */
 export type UseVoiceTranscription = ReturnType<typeof useVoiceTranscription>;
+
+/**
+ * Map our internal Whisper code → BCP-47 used by native recognisers.
+ * For unknown codes, fall back to the device default (return undefined).
+ */
+function whisperToBcp47(code: string | undefined): string | undefined {
+  if (!code) return undefined;
+  const MAP: Record<string, string> = {
+    en: "en-US",
+    hi: "hi-IN",
+    kn: "kn-IN",
+    ta: "ta-IN",
+    te: "te-IN",
+    bn: "bn-IN",
+    mr: "mr-IN",
+    gu: "gu-IN",
+    pa: "pa-IN",
+    ml: "ml-IN",
+    ur: "ur-IN",
+    ar: "ar-SA",
+    es: "es-ES",
+    fr: "fr-FR",
+  };
+  return MAP[code] || code;
+}
+
+// Re-export Platform check so callers can show "not supported on web preview" hints.
+export const IS_SPEECH_NATIVE = Platform.OS !== "web";

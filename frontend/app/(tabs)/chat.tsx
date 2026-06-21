@@ -379,18 +379,8 @@ export default function ChatScreen() {
               testID="chat-input"
             />
             <MicButton
-              onTranscript={(text) => {
-                // Single, idempotent commit point — the hook guarantees this
-                // callback fires AT MOST ONCE per recording session. We still
-                // append (not replace) so any text the user typed manually
-                // before dictating is preserved.
-                setInput((prev) => {
-                  if (!text) return prev;
-                  if (!prev) return text;
-                  const needsSpace = !/\s$/.test(prev);
-                  return `${prev}${needsSpace ? " " : ""}${text}`;
-                });
-              }}
+              value={input}
+              onChangeText={setInput}
               onError={(msg) =>
                 setMessages((m) => [
                   ...m,

@@ -32,8 +32,15 @@ import {
  * button is *just* the trigger surface.
  */
 type Props = {
-  /** Called with the final transcript. Append to your composer state here. */
-  onTranscript: (text: string) => void;
+  /**
+   * The text currently in the composer. The MicButton uses this as a "base"
+   * to which interim + final segments are appended. Host passes the live
+   * value of the input.
+   */
+  value: string;
+  /** Setter that mirrors `value`. Called with the merged text on every
+   *  interim update and final commit. */
+  onChangeText: (text: string) => void;
   /** Optional UI error sink (toast / snackbar). */
   onError?: (msg: string) => void;
   /** Size in pixels (default 40 — matches the chat send button). */
@@ -43,14 +50,47 @@ type Props = {
 };
 
 export const MicButton: React.FC<Props> = ({
-  onTranscript,
+  value,
+  onChangeText,
   onError,
   size = 40,
   testID = "mic-button",
 }) => {
   const { accentColor } = useTheme();
 
-  const voice = useVoiceTranscription({ onTranscript, onError });
+  // The "frozen" base text captured at the moment recording started.
+  // Interim/final segments are appended *to this base* — never to the live
+  // value (which itself contains the interim from previous events). This is
+  // the foundation of the anti-duplicate guarantee: the merge function is
+  // pure and idempotent — calling it multiple times with the same interim
+  // produces the same output every time.
+  const baseRef = useRef("");
+  // Last-final-text — committed text from the recogniser since this session
+  // began. Each new final segment appends here; interim text is rendered on
+  // top of it as a preview.
+  const committedRef = useRef("");
+
+  const merge = (base: string, addition: string) => {
+    if (!addition) return base;
+    if (!base) return addition;
+    return /\s$/.test(base) ? base + addition : base + " " + addition;
+  };
+
+  const voice = useVoiceTranscription({
+    onTranscript: (finalSeg) => {
+      // Promote the committed prefix → this final chunk becomes part of base.
+      committedRef.current = merge(committedRef.current, finalSeg);
+      onChangeText(merge(baseRef.current, committedRef.current));
+    },
+    onInterim: (interim) => {
+      // Replace the rolling tail with the new interim text.
+      // base + committed-so-far + interim — all three are pure projections,
+      // so we never duplicate.
+      const next = merge(merge(baseRef.current, committedRef.current), interim);
+      onChangeText(next);
+    },
+    onError,
+  });
 
   // Pulse the recording indicator. Driven by native animations so it doesn't
   // hitch even while the JS thread is busy with FormData / fetch().
@@ -85,19 +125,25 @@ export const MicButton: React.FC<Props> = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
     if (voice.state === "idle") {
+      // Snapshot the current input as the immutable "base" for this session.
+      // Any further mutation to `value` from outside (e.g. user typing while
+      // we're recording — unlikely but possible) is intentionally ignored:
+      // the merge function is only allowed to read this frozen base, which
+      // is what prevents duplicates if React schedules re-renders out of order.
+      baseRef.current = value;
+      committedRef.current = "";
       void voice.start();
-    } else if (voice.state === "recording") {
+    } else if (voice.state === "listening") {
       void voice.stop();
-    } else if (voice.state === "uploading" || voice.state === "starting") {
-      // Mid-cycle re-tap → ignore (already going); long-press would cancel
-      // but the simple flow keeps the contract obvious for users.
     }
   };
 
   // Long-press while recording = cancel (don't transcribe).
   const onLongPress = () => {
-    if (voice.state === "recording") {
+    if (voice.state === "listening") {
       void voice.cancel();
+      // Roll back any interim text we already streamed into the input.
+      onChangeText(baseRef.current);
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Warning,

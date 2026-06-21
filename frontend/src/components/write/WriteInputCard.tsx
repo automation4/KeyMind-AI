@@ -191,18 +191,13 @@ export function WriteInputCard({
         <View style={styles.inputFooter}>
           <Text style={styles.meta}>{wordCount} WORDS</Text>
           <View style={styles.actionRow}>
-            {/* Mic — dictate text via voice (Whisper). Same anti-duplicate
-                MicButton used in Chat — the hook guarantees `onTranscript`
-                fires at most once per recording session. */}
+            {/* Mic — live native dictation (real-time interim + final text).
+                MicButton owns the text-merge logic, so the host just plumbs
+                value/setter and gets the anti-duplicate guarantee for free. */}
             <MicButton
               size={40}
-              onTranscript={(spoken) => {
-                onChangeText(
-                  text
-                    ? `${text}${/\s$/.test(text) ? "" : " "}${spoken}`
-                    : spoken,
-                );
-              }}
+              value={text}
+              onChangeText={onChangeText}
               onError={(msg) => onError?.(msg)}
               testID="home-mic-btn"
             />

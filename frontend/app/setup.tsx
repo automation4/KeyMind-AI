@@ -56,7 +56,7 @@ export default function Setup() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.eyebrow}>STEP 1 / 1</Text>
         <Text style={styles.title}>Make it{"\n"}yours.</Text>
-        <Text style={styles.subtitle}>Pick your languages and a theme. You can change these later.</Text>
+        <Text style={styles.subtitle}>Pick the languages you write in. You can change these any time in Settings.</Text>
 
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
           <Text style={styles.section}>LANGUAGES YOU WRITE IN</Text>
@@ -81,48 +81,10 @@ export default function Setup() {
           })}
         </View>
 
-        <Text style={styles.section}>THEME</Text>
-        <View style={styles.themeRow}>
-          {(["light", "dark"] as const).map((m) => (
-            <TouchableOpacity
-              key={m}
-              onPress={() => setMode(m)}
-              style={[
-                styles.themeCard,
-                { backgroundColor: m === "light" ? COLORS.bg : COLORS.bgDark },
-                mode === m && styles.themeCardActive,
-              ]}
-              testID={`setup-theme-${m}`}
-            >
-              <Ionicons
-                name={m === "light" ? "sunny" : "moon"}
-                size={28}
-                color={m === "light" ? COLORS.text : COLORS.textInverse}
-              />
-              <Text style={[styles.themeLabel, { color: m === "light" ? COLORS.text : COLORS.textInverse }]}>
-                {m === "light" ? "Light" : "Dark"}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.section}>ACCENT COLOR</Text>
-        <View style={styles.accents}>
-          {ACCENTS.map((a) => (
-            <TouchableOpacity
-              key={a.id}
-              onPress={() => setAccent(a.id)}
-              style={[
-                styles.accent,
-                { backgroundColor: a.color },
-                accent === a.id && styles.accentActive,
-              ]}
-              testID={`setup-accent-${a.id}`}
-            >
-              {accent === a.id ? <Ionicons name="checkmark" size={20} color={COLORS.text} /> : null}
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* THEME + ACCENT COLOR moved exclusively to Settings — keeping the
+            onboarding screen short ("language only") gives users a 1-decision
+            setup. Defaults (Ink + Light) are pleasant for the first session,
+            and Settings has full controls for power users. */}
 
         <TouchableOpacity style={styles.cta} onPress={finish} testID="setup-finish-btn">
           <Text style={styles.ctaText}>START WRITING</Text>
