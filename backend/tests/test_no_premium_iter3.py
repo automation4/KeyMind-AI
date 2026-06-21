@@ -17,8 +17,8 @@ if not BASE_URL:
 BASE_URL = BASE_URL.rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "himthegreat@gmail.com"
-ADMIN_PASSWORD = "aa$fufm2q"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 NEW_LIMIT = 10
 
 

@@ -21,8 +21,8 @@ with open("/app/frontend/.env") as f:
             break
 
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL = "himthegreat@gmail.com"
-ADMIN_PASSWORD = "aa$fufm2q"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 # Unicode script ranges
 DEVANAGARI = ("\u0900", "\u097F")  # Hindi & Sanskrit

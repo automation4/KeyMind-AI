@@ -18,7 +18,7 @@ A true Android system keyboard (IME) would require native Kotlin (`InputMethodSe
 - Session persistence (token stored via `@/src/utils/storage`)
 - `POST /api/auth/session`, `POST /api/auth/guest`, `GET /api/auth/me`, `POST /api/auth/logout`
 - **Admin Auth (hidden email/password)** — `POST /api/auth/admin`
-  - Login screen: "Sign in with email" link → email input → password field appears ONLY when email matches admin email (`himthegreat@gmail.com`)
+  - Login screen: "Sign in with email" link → email input → password field appears ONLY when email matches admin email (`<admin-email-set-in-env>`)
   - Single admin account; password `auto` (configurable via env `ADMIN_EMAIL`, `ADMIN_PASSWORD`)
 
 ### F2b Admin Panel & Subscription Tiers (NEW)
@@ -147,7 +147,7 @@ Testing: iteration_10 — backend 13/13 pytest pass (`/app/backend/tests/test_it
 ## Changelog — 2026-02 (part 7: settings list rows)
 - Settings now has grouped list cards (Speechify-style):
   1. Account card → Name / Email / Subscription (value + chevron → /pricing), testIDs settings-row-*
-  2. "SUPPORT KEYMIND" card → Share KeyMind (RN Share API), Request a Feature (mailto:himthegreat@gmail.com), Review on the Play Store (placeholder Play Store URL com.keymind.app)
+  2. "SUPPORT KEYMIND" card → Share KeyMind (RN Share API), Request a Feature (mailto:<admin-email-set-in-env>), Review on the Play Store (placeholder Play Store URL com.keymind.app)
 - Preview-error investigation: user reported an error during preview but gave no details. Checked: web bundle clean (no console/page errors), Android bundle compiles (1429 modules), backend logs healthy, stale lottie error in expo.err.log is from Jun 9 (pre-fork, resolved). AWAITING user's error screenshot/details.
 
 ## Changelog — 2026-02 (part 8: preview crash fix + matte theme + custom accent)

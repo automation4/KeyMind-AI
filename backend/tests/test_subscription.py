@@ -14,8 +14,8 @@ BASE_URL = (
     or "https://multilingual-text-2.preview.emergentagent.com"
 ).rstrip("/")
 
-ADMIN_EMAIL = "himthegreat@gmail.com"
-ADMIN_PASSWORD = "aa$fufm2q"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 H = {"Content-Type": "application/json"}
 

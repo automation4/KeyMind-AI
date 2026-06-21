@@ -311,8 +311,8 @@ TABLE OF CONTENTS
          # ---- Admin login (used by the 22-tap admin modal) -----------------
          # IMPORTANT: wrap the password in SINGLE quotes so the shell does NOT
          # try to expand the $ inside it.
-         ADMIN_EMAIL=himthegreat@gmail.com
-         ADMIN_PASSWORD='aa$fufm2q'
+         ADMIN_EMAIL=admin@example.com
+         ADMIN_PASSWORD='<your-strong-admin-password>'
 
   6.2  Create  frontend/.env  (copy-paste, then change values):
 
@@ -630,8 +630,8 @@ TABLE OF CONTENTS
         MONGO_URL             = <your Atlas connection string>
         DB_NAME               = keymind_db
         EMERGENT_LLM_KEY      = sk-emergent-xxxxx
-        ADMIN_EMAIL           = himthegreat@gmail.com
-        ADMIN_PASSWORD        = aa$fufm2q          (no quotes here)
+        ADMIN_EMAIL           = admin@example.com
+        ADMIN_PASSWORD        = <your-strong-admin-password>          (no quotes here)
   5. Click "Deployments" tab → wait for first build.
      Railway auto-detects Python, runs:
          pip install -r requirements.txt
@@ -665,8 +665,8 @@ TABLE OF CONTENTS
         fly secrets set MONGO_URL="mongodb+srv://..."
         fly secrets set DB_NAME=keymind_db
         fly secrets set EMERGENT_LLM_KEY=sk-emergent-xxxxx
-        fly secrets set ADMIN_EMAIL=himthegreat@gmail.com
-        fly secrets set ADMIN_PASSWORD='aa$fufm2q'
+        fly secrets set ADMIN_EMAIL=admin@example.com
+        fly secrets set ADMIN_PASSWORD='<your-strong-admin-password>'
   4. fly deploy
   5. URL: https://<your-app>.fly.dev
 

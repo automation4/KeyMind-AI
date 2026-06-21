@@ -47,8 +47,8 @@ if not os.environ.get("MONGO_URL"):
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 
-ADMIN_EMAIL = "himthegreat@gmail.com"
-ADMIN_PASSWORD = "aa$fufm2q"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 GUEST_DEVICE_ID = f"COUNTER_TEST_GUEST_001_{uuid.uuid4().hex[:6]}"
 USER_EMAIL = f"counter_test_user_{uuid.uuid4().hex[:6]}@gmail.com"

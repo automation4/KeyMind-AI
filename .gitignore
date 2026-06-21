@@ -83,6 +83,32 @@ android-sdk/
 .env
 .env.*
 *.env
+!.env.example
 credentials.json
 *.key
 .credentials
+
+# Secrets — Firebase service account, Google services JSON, anything keyish.
+# NEVER commit these — they grant full admin access to the Firestore project
+# and can be used to mint arbitrary IDs / drain credits.
+secrets/
+**/secrets/
+*service-account*.json
+*serviceAccount*.json
+firebase-adminsdk*.json
+*-firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+
+# Auth / cert keystores
+*.jks
+*.p12
+*.p8
+*.pem
+*.der
+
+# Agent-internal scratch files — historical test reports and PRD drafts
+# may contain credentials snapshots. Keep out of the public repo.
+test_reports/
+.agent-scratch/
+.emergent/

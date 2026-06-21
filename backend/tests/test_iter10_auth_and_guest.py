@@ -8,8 +8,8 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://multilingual-text-2.preview.emergentagent.com").rstrip("/")
-ADMIN_EMAIL = "himthegreat@gmail.com"
-ADMIN_PASSWORD = "aa$fufm2q"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 EXISTING_USER_EMAIL = "testuser@keymind.app"
 EXISTING_USER_PASSWORD = "testpass123"
 

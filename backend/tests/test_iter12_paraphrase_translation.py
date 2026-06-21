@@ -34,8 +34,8 @@ def admin_token(api_client):
     r = api_client.post(
         f"{BASE_URL}/api/auth/login",
         json={
-            "email": os.environ.get("ADMIN_EMAIL", "himthegreat@gmail.com"),
-            "password": os.environ.get("ADMIN_PASSWORD", "aa$fufm2q"),
+            "email": os.environ.get("ADMIN_EMAIL", ""),
+            "password": os.environ.get("ADMIN_PASSWORD", ""),
         },
         timeout=30,
     )

@@ -26,8 +26,8 @@ def admin_token(api_client):
     """Admin login to bypass guest daily limit."""
     r = api_client.post(
         f"{BASE_URL}/api/auth/login",
-        json={"email": os.environ.get("ADMIN_EMAIL", "himthegreat@gmail.com"),
-              "password": os.environ.get("ADMIN_PASSWORD", "aa$fufm2q")},
+        json={"email": os.environ.get("ADMIN_EMAIL", ""),
+              "password": os.environ.get("ADMIN_PASSWORD", "")},
         timeout=30,
     )
     assert r.status_code == 200, f"admin login failed: {r.status_code} {r.text}"
