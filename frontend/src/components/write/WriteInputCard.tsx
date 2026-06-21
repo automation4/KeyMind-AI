@@ -18,6 +18,7 @@ import * as ImagePicker from "expo-image-picker";
 import { COLORS, SHADOW, FONT, RADIUS } from "@/src/lib/theme";
 import { api } from "@/src/lib/api";
 import { getWritePlaceholder } from "@/src/lib/localePlaceholder";
+import { MicButton } from "@/src/components/MicButton";
 
 type Props = {
   text: string;
@@ -190,6 +191,21 @@ export function WriteInputCard({
         <View style={styles.inputFooter}>
           <Text style={styles.meta}>{wordCount} WORDS</Text>
           <View style={styles.actionRow}>
+            {/* Mic — dictate text via voice (Whisper). Same anti-duplicate
+                MicButton used in Chat — the hook guarantees `onTranscript`
+                fires at most once per recording session. */}
+            <MicButton
+              size={40}
+              onTranscript={(spoken) => {
+                onChangeText(
+                  text
+                    ? `${text}${/\s$/.test(text) ? "" : " "}${spoken}`
+                    : spoken,
+                );
+              }}
+              onError={(msg) => onError?.(msg)}
+              testID="home-mic-btn"
+            />
             {/* Camera — capture a fresh photo and extract its text. */}
             <TouchableOpacity
               onPress={handleCamera}
