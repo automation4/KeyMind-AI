@@ -31,6 +31,7 @@ import { AccentColorPicker } from "@/src/components/AccentColorPicker";
 import { api } from "@/src/lib/api";
 import { useScrollFab } from "@/src/components/ScrollFab";
 import { contrastOn } from "@/src/lib/colorUtils";
+import { useDictateLanguage } from "@/src/hooks/useDictateLanguage";
 
 type AccentDef = { id: AccentName; color: string };
 
@@ -70,6 +71,7 @@ export default function SettingsScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const fab = useScrollFab(scrollRef, { bottomOffset: tabBarHeight + 16 });
   const { mode, accent, customAccent, pattern, setMode, setAccent, setCustomAccent, setPattern, accentColor } = useTheme();
+  const dictate = useDictateLanguage();
   const router = useRouter();
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
@@ -425,6 +427,38 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* Dictation language — controls how voice → text works in Chat. */}
+        <Text style={styles.section}>DICTATION LANGUAGE</Text>
+        <View style={[styles.row, { flexWrap: "wrap", gap: 8 }]}>
+          {dictate.options.map((o) => {
+            const key = o.uiKey ?? o.code;
+            const active = dictate.uiKey === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                onPress={() => dictate.setLanguage(key)}
+                style={[
+                  styles.langChip,
+                  active && { backgroundColor: accentColor, borderColor: accentColor },
+                ]}
+                testID={`settings-dictate-${key}`}
+              >
+                <Text
+                  style={[
+                    styles.langChipText,
+                    active && { color: contrastOn(accentColor) },
+                  ]}
+                >
+                  {o.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={styles.hint}>
+          Tap the 🎙️ button in Chat to dictate. &quot;Auto (mixed)&quot; and &quot;Hinglish&quot; let Whisper code-switch naturally between Hindi and English.
+        </Text>
+
         {/* Theme */}
         <Text style={styles.section}>THEME</Text>
         <View style={styles.row}>
@@ -746,6 +780,25 @@ const styles = StyleSheet.create({
   subSub: { marginTop: 2, fontSize: 12, fontWeight: FONT.bold, color: COLORS.text, opacity: 0.85 },
 
   section: { marginTop: 28, marginBottom: 10, fontSize: 11, fontWeight: FONT.black, letterSpacing: 1.5, color: COLORS.text },
+  langChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  langChipText: {
+    fontSize: 13,
+    fontWeight: FONT.bold,
+    color: COLORS.text,
+  },
+  hint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    lineHeight: 16,
+  },
   lockedHint: { marginBottom: 10, fontSize: 10, fontWeight: FONT.black, color: COLORS.textMuted, letterSpacing: 1 },
   row: { flexDirection: "row", gap: 10 },
   themeCard: {

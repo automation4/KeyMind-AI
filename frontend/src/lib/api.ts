@@ -21,7 +21,16 @@ async function request<T = any>(
   options: { method?: string; body?: any; auth?: boolean } = {},
 ): Promise<T> {
   const { method = "GET", body, auth = false } = options;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+
+  // FormData (multipart/file uploads) needs the runtime to set its own
+  // Content-Type with the boundary. If we set application/json we'd corrupt
+  // the upload, so detect FormData and skip JSON serialisation entirely.
+  const isFormData =
+    typeof FormData !== "undefined" && body instanceof FormData;
+
+  const headers: Record<string, string> = {};
+  if (!isFormData) headers["Content-Type"] = "application/json";
+
   // Always send auth if a token exists — backend uses it to track per-user usage limits.
   const token = await getToken();
   if ((auth || token) && token) {
@@ -30,7 +39,7 @@ async function request<T = any>(
   const res = await fetch(`${BASE}/api${path}`, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -95,6 +104,31 @@ export const api = {
       method: "POST",
       body: { text, voice, language },
     }),
+
+  /**
+   * Upload a voice-input clip → server-side Whisper-1 → transcript.
+   * Pass `language` (ISO-639-1 like "hi", "en") to bias detection.
+   *   • Mobile: `uri` is a `file://...` path returned by expo-audio.
+   *   • Web:    `uri` is a `blob:` URL — we fetch it back to a Blob first.
+   */
+  transcribe: async (uri: string, language?: string) => {
+    const form = new FormData();
+    if (language) form.append("language", language);
+    if (uri.startsWith("blob:") || uri.startsWith("data:")) {
+      const blob = await (await fetch(uri)).blob();
+      form.append("audio", blob, "voice.webm");
+    } else {
+      const ext = uri.split(".").pop()?.toLowerCase() || "m4a";
+      const mime = ext === "mp3" ? "audio/mpeg" : ext === "wav" ? "audio/wav" : "audio/m4a";
+      // React Native's FormData accepts the `{ uri, name, type }` shape.
+      // @ts-expect-error — RN FormData polyfill supports the file object shape.
+      form.append("audio", { uri, name: `voice.${ext}`, type: mime });
+    }
+    return request<{ text: string }>("/transcribe", {
+      method: "POST",
+      body: form,
+    });
+  },
 
   chat: (session_id: string, message: string) =>
     request<{ session_id: string; reply: string }>("/ai/chat", {

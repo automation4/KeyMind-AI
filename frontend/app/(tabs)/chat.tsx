@@ -30,6 +30,7 @@ import { MarkdownText, stripMarkdown } from "@/src/components/MarkdownText";
 import { VocabCard, VocabData, VocabLanguage } from "@/src/components/VocabCard";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { storage } from "@/src/utils/storage";
+import { MicButton } from "@/src/components/MicButton";
 
 const VOCAB_LANG_KEY = "keymind_vocab_lang";
 
@@ -376,6 +377,27 @@ export default function ChatScreen() {
               style={styles.composerInput}
               multiline
               testID="chat-input"
+            />
+            <MicButton
+              onTranscript={(text) => {
+                // Single, idempotent commit point — the hook guarantees this
+                // callback fires AT MOST ONCE per recording session. We still
+                // append (not replace) so any text the user typed manually
+                // before dictating is preserved.
+                setInput((prev) => {
+                  if (!text) return prev;
+                  if (!prev) return text;
+                  const needsSpace = !/\s$/.test(prev);
+                  return `${prev}${needsSpace ? " " : ""}${text}`;
+                });
+              }}
+              onError={(msg) =>
+                setMessages((m) => [
+                  ...m,
+                  { role: "assistant", content: `🎙️ ${msg}` },
+                ])
+              }
+              testID="chat-mic-btn"
             />
             <TouchableOpacity
               style={[
