@@ -1,9 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Header, Request, File, UploadFile, Form
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient  # legacy import kept for type compat (unused)
-# `ReturnDocument` was originally `pymongo.ReturnDocument` — we now route it
-# through the Firestore compat shim so the existing call sites keep working.
 import hashlib
 import os
 import logging
@@ -38,8 +35,6 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 # Env
-MONGO_URL = os.environ.get("MONGO_URL", "")  # legacy: unused after Firestore swap
-DB_NAME = os.environ.get("DB_NAME", "")      # legacy: unused after Firestore swap
 EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
 
 # Admin credentials (single-admin app) — provided via backend/.env only,
@@ -61,7 +56,6 @@ FREE_TOOL_DAILY_LIMIT = int(os.environ.get("FREE_TOOL_DAILY_LIMIT", "5"))
 # `update_one(...)`, `find_one_and_update(...)`, etc. surface used by Motor,
 # so the entire request layer below stayed untouched.
 from firestore_compat import db, ReturnDocument  # noqa: E402
-client = None  # legacy: kept so `client.close()` in shutdown handler doesn't break.
 
 app = FastAPI(title="KeyMind AI Backend")
 api = APIRouter(prefix="/api")
@@ -1378,8 +1372,4 @@ async def _dedupe_guest_users() -> None:
 @app.on_event("shutdown")
 async def shutdown_db_client():
     # Firestore client is a process-wide singleton — nothing to close.
-    if client is not None:
-        try:
-            client.close()
-        except Exception:
-            pass
+    return None
